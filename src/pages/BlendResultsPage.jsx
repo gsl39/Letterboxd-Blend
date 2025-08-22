@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState, useRef, useCallback } from "react";
 import BackgroundGlow from "../components/BackgroundGlow";
 import { supabase } from "../supabaseClient";
+import { BACKEND_URL } from "../config";
 
 
 
@@ -214,7 +215,7 @@ export default function BlendResultsPage() {
         setHasStartedScraping(true);
         setIsScraping(true);
         try {
-          await fetch('http://localhost:3001/api/scrape', {
+          await fetch(`${BACKEND_URL}/api/scrape`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -249,7 +250,7 @@ export default function BlendResultsPage() {
       setCalculating(true);
       
       try {
-        const response = await fetch('http://localhost:3001/api/compatibility', {
+        const response = await fetch(`${BACKEND_URL}/api/compatibility`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -306,7 +307,7 @@ export default function BlendResultsPage() {
         }
       };
       
-      fetch('http://localhost:3001/api/common-movies', {
+              fetch(`${BACKEND_URL}/api/common-movies`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -332,7 +333,7 @@ export default function BlendResultsPage() {
       });
 
       // Fetch biggest disagreement movie
-      fetch('http://localhost:3001/api/biggest-disagreement', {
+              fetch(`${BACKEND_URL}/api/biggest-disagreement`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

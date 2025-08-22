@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS user_films (
     film_slug VARCHAR(255) REFERENCES films(film_slug) ON DELETE CASCADE,
     rating DECIMAL(2,1) CHECK (rating >= 0 AND rating <= 5), -- 0.0 to 5.0
     liked BOOLEAN DEFAULT FALSE,
-    review_text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_handle, film_slug)
@@ -63,7 +62,6 @@ SELECT
     uf.film_slug,
     uf.rating,
     uf.liked,
-    uf.review_text,
     f.film_title,
     f.year,
     f.director,

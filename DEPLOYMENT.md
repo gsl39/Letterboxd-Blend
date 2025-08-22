@@ -32,37 +32,40 @@ VITE_BACKEND_URL=your_backend_url
 ### 4. Deploy
 Click "Deploy" and wait for the build to complete!
 
-## ⚙️ Backend Deployment (Railway)
+## ⚙️ Backend Deployment (Render)
 
-### 1. Connect to Railway
-1. Go to [railway.app](https://railway.app) and sign in with GitHub
-2. Click "New Project"
-3. Select "Deploy from GitHub repo"
-4. Choose your `letterboxd-blend` repository
+### 1. Connect to Render
+1. Go to [render.com](https://render.com) and sign in with GitHub
+2. Click "New +" → "Web Service"
+3. Connect your `letterboxd-blend` repository
 
 ### 2. Configure Service
+- **Name**: `letterboxd-blend-backend` (or whatever you prefer)
 - **Source Directory**: `server`
 - **Build Command**: `npm install`
 - **Start Command**: `node index.cjs`
+- **Plan**: Free (or choose paid if you need more resources)
 
 ### 3. Environment Variables
-Add these in Railway dashboard:
+Add these in Render dashboard:
 ```
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 NODE_ENV=production
-PORT=3001
+PORT=10000
 ```
 
+**Note**: Render uses port 10000 by default, but your code expects 3001. The PORT env var will override this.
+
 ### 4. Deploy
-Railway will automatically deploy when you push to your main branch!
+Render will automatically deploy when you push to your main branch!
 
 ## 🔄 Alternative Backend Options
 
-### Render
-- Similar to Railway
-- Free tier available
+### Railway
+- Similar to Render
+- Free tier available (500 hours/month)
 - Good for Node.js apps
 
 ### Heroku

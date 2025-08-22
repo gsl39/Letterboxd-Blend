@@ -4,6 +4,7 @@ import QRCodeDisplay from "../components/qrCode";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { BACKEND_URL } from "../config";
 
 export default function StartBlendPage() {
   const [handle, setHandle] = useState("");
@@ -22,7 +23,7 @@ export default function StartBlendPage() {
     setBlendId(blend_id);
 
     // Call your Express API to scrape movies for User A
-    await fetch('http://localhost:3001/api/scrape', {
+          await fetch(`${BACKEND_URL}/api/scrape`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ handle: cleanHandle, blend_id, user: 'a' }),
