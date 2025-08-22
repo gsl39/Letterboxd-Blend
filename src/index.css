@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+@keyframes slowFloat {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+}
+
+.glow-animate {
+  animation: slowFloat 5s ease-in-out infinite;
+}
+
+@keyframes fadeInOnce {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-once {
+  animation: fadeInOnce 1s ease-out forwards;
+}
+
+@keyframes colorShift {
+  0% { filter: hue-rotate(0deg) saturate(1); }
+  25% { filter: hue-rotate(90deg) saturate(1.5); }
+  50% { filter: hue-rotate(180deg) saturate(2); }
+  75% { filter: hue-rotate(270deg) saturate(1.5); }
+  100% { filter: hue-rotate(360deg) saturate(1); }
+}
+
+@keyframes bounceAround1 {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(200px, -150px); }
+  40% { transform: translate(400px, 100px); }
+  60% { transform: translate(200px, 300px); }
+  80% { transform: translate(-100px, 200px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes bounceAround2 {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-300px, -200px); }
+  50% { transform: translate(-500px, 100px); }
+  75% { transform: translate(-200px, 400px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes bounceAround3 {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(300px, -300px); }
+  66% { transform: translate(-200px, 300px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes fadeInBlobs {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.1); 
+  }
+  25% { 
+    opacity: 0.02; 
+    transform: scale(0.1); 
+  }
+  50% { 
+    opacity: 0.05; 
+    transform: scale(0.1); 
+  }
+  75% { 
+    opacity: 0.08; 
+    transform: scale(0.1); 
+  }
+  100% { 
+    opacity: 0.1; 
+    transform: scale(1); 
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+    filter: blur(100px);
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.2); 
+    filter: blur(80px);
+  }
+}
+
+.color-shift {
+  animation: colorShift 3s linear infinite;
+}
+
+.bounce-around-1 {
+  animation: bounceAround1 12s linear infinite;
+}
+
+.bounce-around-2 {
+  animation: bounceAround2 15s linear infinite;
+}
+
+.bounce-around-3 {
+  animation: bounceAround3 18s linear infinite;
+}
+
+.fade-in-blobs {
+  opacity: 0; /* Start completely invisible */
+  animation: fadeInBlobs 20s ease-out forwards;
+}
+
+/* Make all blob elements start invisible by default */
+.blob-element {
+  opacity: 0;
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Smooth transitions for background animations */
+.background-transition {
+  transition: all 0.5s ease-in-out;
+}
+
+@keyframes rainbowMadness {
+  0% { filter: hue-rotate(0deg) saturate(2) brightness(1); }
+  16% { filter: hue-rotate(60deg) saturate(3) brightness(1.2); }
+  33% { filter: hue-rotate(120deg) saturate(2.5) brightness(0.8); }
+  50% { filter: hue-rotate(180deg) saturate(3) brightness(1.1); }
+  66% { filter: hue-rotate(240deg) saturate(2) brightness(0.9); }
+  83% { filter: hue-rotate(300deg) saturate(2.5) brightness(1.3); }
+  100% { filter: hue-rotate(360deg) saturate(2) brightness(1); }
+}
+
+@keyframes gradientX {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.rainbow-madness {
+  animation: rainbowMadness 1.5s linear infinite;
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradientX 4s ease infinite;
+}
+
+@keyframes fadeInOnce {
+  0% { 
+    opacity: 0; 
+    transform: translateY(20px) scale(0.95); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+  }
+}
+
+.fade-in-once {
+  animation: fadeInOnce 1s ease-in-out forwards;
+}
