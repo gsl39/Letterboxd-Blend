@@ -349,12 +349,13 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-const server = app.listen(3001, (err) => {
+const PORT = process.env.PORT || 3001;
+const server = app.listen(PORT, (err) => {
   if (err) {
     console.error('Failed to start server:', err);
     process.exit(1);
   }
-  console.log('API running on port 3001');
+  console.log(`API running on port ${PORT}`);
 });
 
 server.on('error', (err) => {
