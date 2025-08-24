@@ -218,14 +218,14 @@ function thematicOverlapScore(userAFilms, userBFilms) {
   const genresB = new Set();
   
   userAFilms.forEach(film => {
-    if (film.films_genres && Array.isArray(film.films_genres)) {
-      film.films_genres.forEach(genre => genresA.add(genre));
+    if (film.genres && Array.isArray(film.genres)) {
+      film.genres.forEach(genre => genresA.add(genre));
     }
   });
   
   userBFilms.forEach(film => {
-    if (film.films_genres && Array.isArray(film.films_genres)) {
-      film.films_genres.forEach(genre => genresB.add(genre));
+    if (film.genres && Array.isArray(film.genres)) {
+      film.genres.forEach(genre => genresB.add(genre));
     }
   });
   
@@ -241,12 +241,12 @@ function thematicOverlapScore(userAFilms, userBFilms) {
 // Helper function to calculate obscurity alignment score
 function obscurityAlignmentScore(userAFilms, userBFilms, bins = 12) {
   const popularityA = userAFilms
-    .filter(film => film.films_popularity !== null)
-    .map(film => Math.log1p(film.films_popularity));
+    .filter(film => film.popularity !== null)
+    .map(film => Math.log1p(film.popularity));
   
   const popularityB = userBFilms
-    .filter(film => film.films_popularity !== null)
-    .map(film => Math.log1p(film.films_popularity));
+    .filter(film => film.popularity !== null)
+    .map(film => Math.log1p(film.popularity));
   
   if (popularityA.length === 0 || popularityB.length === 0) return 0.0;
   
@@ -296,8 +296,8 @@ function directorOverlapScore(userAFilms, userBFilms, minCount = 3) {
   const directorCountsB = new Map();
   
   userAFilms.forEach(film => {
-    if (film.film_directors && Array.isArray(film.film_directors)) {
-      film.film_directors.forEach(director => {
+    if (film.directors && Array.isArray(film.directors)) {
+      film.directors.forEach(director => {
         const name = director.trim();
         directorCountsA.set(name, (directorCountsA.get(name) || 0) + 1);
       });
@@ -305,8 +305,8 @@ function directorOverlapScore(userAFilms, userBFilms, minCount = 3) {
   });
   
   userBFilms.forEach(film => {
-    if (film.film_directors && Array.isArray(film.film_directors)) {
-      film.film_directors.forEach(director => {
+    if (film.directors && Array.isArray(film.directors)) {
+      film.directors.forEach(director => {
         const name = director.trim();
         directorCountsB.set(name, (directorCountsB.get(name) || 0) + 1);
       });
@@ -348,14 +348,14 @@ function diversityBonus(userAFilms, userBFilms, maxGenres = 20) {
   const genres = new Set();
   
   userAFilms.forEach(film => {
-    if (mutualSlugs.has(film.film_slug) && film.films_genres && Array.isArray(film.films_genres)) {
-      film.films_genres.forEach(genre => genres.add(genre.trim()));
+    if (mutualSlugs.has(film.film_slug) && film.genres && Array.isArray(film.genres)) {
+      film.genres.forEach(genre => genres.add(genre.trim()));
     }
   });
   
   userBFilms.forEach(film => {
-    if (mutualSlugs.has(film.film_slug) && film.films_genres && Array.isArray(film.films_genres)) {
-      film.films_genres.forEach(genre => genres.add(genre.trim()));
+    if (mutualSlugs.has(film.film_slug) && film.genres && Array.isArray(film.genres)) {
+      film.genres.forEach(genre => genres.add(genre.trim()));
     }
   });
   
@@ -365,10 +365,10 @@ function diversityBonus(userAFilms, userBFilms, maxGenres = 20) {
 
 // Helper function to calculate average popularity for a user
 function calculateAveragePopularity(userFilms) {
-  const filmsWithPopularity = userFilms.filter(film => film.films_popularity !== null);
+  const filmsWithPopularity = userFilms.filter(film => film.popularity !== null);
   if (filmsWithPopularity.length === 0) return null;
   
-  const totalPopularity = filmsWithPopularity.reduce((sum, film) => sum + film.films_popularity, 0);
+  const totalPopularity = filmsWithPopularity.reduce((sum, film) => sum + film.popularity, 0);
   return Math.round((totalPopularity / filmsWithPopularity.length) * 100) / 100;
 }
 
@@ -564,17 +564,40 @@ async function getCommonFilmsStats(userA, userB) {
     console.log('Debug [NEW]: Starting to fetch user films...');
     
     // Get all films for both users
+    console.log('🔍 Fetching films for userA:', userA);
     const { data: userAFilms, error: errorA } = await supabase
       .from('user_films_with_films')
       .select('*')
       .eq('user_handle', userA);
     
+    console.log('🔍 Fetching films for userB:', userB);
     const { data: userBFilms, error: errorB } = await supabase
       .from('user_films_with_films')
       .select('*')
       .eq('user_handle', userB);
     
-    console.log('Debug [NEW]: Fetched films - userA:', userAFilms?.length, 'userB:', userBFilms?.length);
+    console.log('📊 Fetched films - userA:', userAFilms?.length, 'userB:', userBFilms?.length);
+    
+    // Debug: Show the actual structure of what we got
+    if (userAFilms && userAFilms.length > 0) {
+      console.log('🔍 Sample userA film structure:', {
+        film_slug: userAFilms[0].film_slug,
+        rating: userAFilms[0].rating,
+        genres: userAFilms[0].genres,
+        directors: userAFilms[0].directors,
+        all_keys: Object.keys(userAFilms[0])
+      });
+    }
+    
+    if (userBFilms && userBFilms.length > 0) {
+      console.log('🔍 Sample userB film structure:', {
+        film_slug: userBFilms[0].film_slug,
+        rating: userBFilms[0].rating,
+        genres: userBFilms[0].genres,
+        directors: userBFilms[0].directors,
+        all_keys: Object.keys(userBFilms[0])
+      });
+    }
     
     if (errorA || errorB) {
       console.error('Error fetching user films:', errorA || errorB);
