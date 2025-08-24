@@ -67,17 +67,39 @@ app.post('/api/scrape', async (req, res) => {
     console.log('Unique slugs:', uniqueSlugs);
     
     // Check which films already exist in the database
-    const { data: existingFilms, error: checkError } = await supabase
-      .from('films')
-      .select('film_slug')
-      .in('film_slug', uniqueSlugs);
+    // Use a more efficient approach to avoid 414 errors with long URLs
+    let existingSlugs = new Set();
+    let checkError = null;
+    
+    try {
+      // Process in smaller batches to avoid URL length issues
+      const batchSize = 50; // Process 50 slugs at a time
+      for (let i = 0; i < uniqueSlugs.length; i += batchSize) {
+        const batch = uniqueSlugs.slice(i, i + batchSize);
+        const { data: batchFilms, error: batchError } = await supabase
+          .from('films')
+          .select('film_slug')
+          .in('film_slug', batch);
+        
+        if (batchError) {
+          console.error('Error checking batch of existing films:', batchError);
+          checkError = batchError;
+          break;
+        }
+        
+        // Add to existing slugs set
+        batchFilms?.forEach(f => existingSlugs.add(f.film_slug));
+      }
+    } catch (err) {
+      console.error('Error in batch checking existing films:', err);
+      checkError = err;
+    }
     
     if (checkError) {
       console.error('Error checking existing films:', checkError);
       throw checkError;
     }
     
-    const existingSlugs = new Set(existingFilms?.map(f => f.film_slug) || []);
     const newSlugs = uniqueSlugs.filter(slug => !existingSlugs.has(slug));
     
     console.log(`Found ${existingSlugs.size} existing films, ${newSlugs.length} new films to scrape`);
