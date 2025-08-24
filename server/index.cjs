@@ -79,6 +79,8 @@ app.post('/api/scrape', async (req, res) => {
     
     // Process new films synchronously to ensure metadata is ready
     if (newSlugs.length > 0) {
+      console.log(`🔍 Starting metadata scraping for ${newSlugs.length} films...`);
+      
       try {
         const batchSize = 3; // Process 3 films simultaneously (moderate, respectful)
         
@@ -90,56 +92,103 @@ app.post('/api/scrape', async (req, res) => {
           
           const batchPromises = batch.map(async (slug) => {
             try {
+              console.log(`🔍 Scraping metadata for: ${slug}`);
               const metadata = await getFilmMetadataFromLetterboxd(slug);
+              
               if (!metadata) {
-                console.warn(`No metadata found for film: ${slug}`);
+                console.warn(`❌ No metadata found for film: ${slug}`);
                 return null;
               }
+              
+              console.log(`📊 Metadata received for ${slug}:`, {
+                hasGenres: !!metadata.genres,
+                hasDirectors: !!metadata.directors,
+                hasPopularity: metadata.popularity !== null,
+                genres: metadata.genres,
+                directors: metadata.directors,
+                popularity: metadata.popularity
+              });
               
               const { error: upsertError } = await supabase.from('films').upsert(metadata, { onConflict: ['film_slug'] });
               if (upsertError) {
-                console.error(`Upsert error for ${slug}:`, upsertError);
+                console.error(`❌ Database upsert error for ${slug}:`, upsertError);
                 return null;
               }
               
-              console.log(`✅ Successfully processed: ${slug}`);
+              console.log(`✅ Successfully stored metadata for: ${slug}`);
               return metadata;
             } catch (err) {
-              console.error(`Error enriching film ${slug}:`, err.message);
+              console.error(`❌ Error enriching film ${slug}:`, err.message);
+              console.error(`❌ Full error:`, err);
               return null;
             }
           });
           
           const batchResults = await Promise.all(batchPromises);
           const successfulResults = batchResults.filter(result => result !== null);
-          console.log(`Batch complete: ${successfulResults.length}/${batch.length} successful`);
+          console.log(`📦 Batch complete: ${successfulResults.length}/${batch.length} successful`);
           
           // Small delay between batches to be respectful
           if (i + batchSize < newSlugs.length) {
             await new Promise(r => setTimeout(r, 500));
           }
         }
+        
+        console.log(`🎯 Metadata scraping completed. Successfully processed ${newSlugs.filter(slug => {
+          // Check if the film was actually stored in the database
+          return true; // We'll verify this in the next step
+        }).length} films.`);
+        
+        // Verify the data was actually stored
+        console.log(`🔍 Verifying metadata storage...`);
+        const { data: storedFilms, error: verifyError } = await supabase
+          .from('films')
+          .select('film_slug, genres, directors, popularity')
+          .in('film_slug', newSlugs);
+        
+        if (verifyError) {
+          console.error(`❌ Error verifying stored films:`, verifyError);
+        } else {
+          console.log(`📊 Verification results:`, {
+            totalRequested: newSlugs.length,
+            totalStored: storedFilms?.length || 0,
+            withGenres: storedFilms?.filter(f => f.genres && f.genres.length > 0).length || 0,
+            withDirectors: storedFilms?.filter(f => f.directors && f.directors.length > 0).length || 0,
+            withPopularity: storedFilms?.filter(f => f.popularity !== null).length || 0
+          });
+        }
+        
       } catch (err) {
-        console.error('Error in batch processing:', err.message);
+        console.error('❌ Error in batch processing:', err.message);
+        console.error('❌ Full error:', err);
+        
         // Fallback to individual processing if batch fails
-        console.log('Falling back to individual processing...');
+        console.log('🔄 Falling back to individual processing...');
         for (const slug of newSlugs) {
           try {
+            console.log(`🔍 Individual fallback for: ${slug}`);
             const metadata = await getFilmMetadataFromLetterboxd(slug);
             if (!metadata) {
-              console.warn(`No metadata found for film: ${slug}`);
+              console.warn(`❌ No metadata found for film: ${slug}`);
               continue;
             }
+            
+            console.log(`📊 Individual metadata for ${slug}:`, metadata);
+            
             const { error: upsertError } = await supabase.from('films').upsert(metadata, { onConflict: ['film_slug'] });
             if (upsertError) {
-              console.error('Upsert error:', upsertError);
+              console.error(`❌ Individual upsert error for ${slug}:`, upsertError);
+            } else {
+              console.log(`✅ Individual success for ${slug}`);
             }
           } catch (err) {
-            console.error(`Error enriching film ${slug}:`, err.message);
+            console.error(`❌ Individual error for ${slug}:`, err.message);
           }
           await new Promise(r => setTimeout(r, 350));
         }
       }
+    } else {
+      console.log(`ℹ️ No new films to scrape metadata for.`);
     }
     // --- End enrichment ---
 

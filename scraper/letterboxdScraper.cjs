@@ -71,9 +71,11 @@ async function getAllWatchedMovies(username) {
 
 async function getFilmMetadataFromLetterboxd(slug) {
   const url = `https://letterboxd.com/film/${slug}/`;
+  console.log(`🔍 Starting metadata scrape for: ${slug} at ${url}`);
   
   try {
     // Get basic metadata with axios/cheerio (faster for static content)
+    console.log(`📡 Fetching HTML for ${slug}...`);
     const { data } = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -85,6 +87,13 @@ async function getFilmMetadataFromLetterboxd(slug) {
       },
       timeout: 15000, // Reduced from 30000 for faster failure detection
     });
+    
+    if (!data) {
+      console.error(`❌ No HTML data received for ${slug}`);
+      return null;
+    }
+    
+    console.log(`✅ HTML received for ${slug}, length: ${data.length}`);
     const $ = cheerio.load(data);
 
     // Year
@@ -93,6 +102,7 @@ async function getFilmMetadataFromLetterboxd(slug) {
     if (yearText && /^\d{4}$/.test(yearText)) {
       year = parseInt(yearText, 10);
     }
+    console.log(`📅 Year for ${slug}: ${year} (raw: "${yearText}")`);
 
     // Poster URL
     let poster_url = null;
@@ -102,21 +112,25 @@ async function getFilmMetadataFromLetterboxd(slug) {
     if (posterImg) {
       poster_url = posterImg.startsWith('//') ? 'https:' + posterImg : posterImg;
     }
+    console.log(`🖼️ Poster URL for ${slug}: ${poster_url}`);
 
     // Genres
     const genres = [];
     $('a[href^="/films/genre/"]').each((i, el) => {
       genres.push($(el).text().trim());
     });
+    console.log(`🎭 Genres for ${slug}: ${genres.length} found - ${genres.join(', ')}`);
 
     // Directors
     const directors = [];
     $('.credits .creatorlist a.contributor .prettify').each((i, el) => {
       directors.push($(el).text().trim());
     });
+    console.log(`🎬 Directors for ${slug}: ${directors.length} found - ${directors.join(', ')}`);
 
     // Get popularity with Puppeteer (for JavaScript-rendered content)
     let popularity = null;
+    console.log(`📊 Starting popularity scrape for ${slug}...`);
     try {
       const browser = await puppeteer.launch({ 
         headless: true,
@@ -132,9 +146,11 @@ async function getFilmMetadataFromLetterboxd(slug) {
       await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       
       // Moderate optimization: faster page loading
+      console.log(`🌐 Loading page for ${slug}...`);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
       
       // Wait for the production statistics to load
+      console.log(`⏳ Waiting for popularity data for ${slug}...`);
       await page.waitForSelector('.production-statistic.-watches', { timeout: 8000 }); // Reduced from 10000
       
       // Extract the popularity data
@@ -146,21 +162,30 @@ async function getFilmMetadataFromLetterboxd(slug) {
         return null;
       });
       
-              // Parse the popularity number
-        if (popularityData) {
-          const popularityMatch = popularityData.match(/Watched by ([\d,]+)/);
-          if (popularityMatch) {
-            popularity = parseInt(popularityMatch[1].replace(/,/g, ''), 10);
-          }
+      console.log(`📊 Raw popularity data for ${slug}: "${popularityData}"`);
+      
+      // Parse the popularity number
+      if (popularityData) {
+        const popularityMatch = popularityData.match(/Watched by ([\d,]+)/);
+        if (popularityMatch) {
+          popularity = parseInt(popularityMatch[1].replace(/,/g, ''), 10);
+          console.log(`✅ Parsed popularity for ${slug}: ${popularity}`);
+        } else {
+          console.log(`❌ Could not parse popularity for ${slug}: "${popularityData}"`);
         }
+      } else {
+        console.log(`❌ No popularity data found for ${slug}`);
+      }
       
       await browser.close();
+      console.log(`🔒 Browser closed for ${slug}`);
     } catch (puppeteerError) {
-      console.error(`Error getting popularity for ${slug}:`, puppeteerError.message);
+      console.error(`❌ Error getting popularity for ${slug}:`, puppeteerError.message);
+      console.error(`❌ Full puppeteer error for ${slug}:`, puppeteerError);
       // Continue without popularity data
     }
 
-    return {
+    const result = {
       film_slug: slug,
       year,
       poster_url: poster_url || '',
@@ -168,6 +193,9 @@ async function getFilmMetadataFromLetterboxd(slug) {
       directors: directors.length ? directors : null,
       popularity
     };
+    
+    console.log(`🎯 Final metadata result for ${slug}:`, result);
+    return result;
   } catch (err) {
     console.error(`Error scraping metadata for film slug '${slug}':`, err.message);
     return null;
