@@ -708,6 +708,8 @@ async function getCommonFilmsStats(userA, userB) {
 // Main function to calculate compatibility between two users
 async function getCompatibilityScore(userA, userB) {
   try {
+    console.log('🔍 Starting compatibility calculation for:', userA, 'vs', userB);
+    
     const userAFilms = await getUserFilmsData(userA);
     const userBFilms = await getUserFilmsData(userB);
     
@@ -718,6 +720,37 @@ async function getCompatibilityScore(userA, userB) {
         user_b: userB
       };
     }
+    
+    console.log('📊 Films loaded - userA:', userAFilms.length, 'userB:', userBFilms.length);
+    
+    // Check if ALL movies have metadata before proceeding
+    const userAMissingMetadata = userAFilms.filter(film => 
+      !film.genres || !film.directors || film.popularity === null
+    );
+    const userBMissingMetadata = userBFilms.filter(film => 
+      !film.genres || !film.directors || film.popularity === null
+    );
+    
+    console.log('🔍 Metadata check - userA missing:', userAMissingMetadata.length, 'userB missing:', userBMissingMetadata.length);
+    
+    if (userAMissingMetadata.length > 0 || userBMissingMetadata.length > 0) {
+      console.log('❌ Some movies missing metadata - cannot calculate compatibility yet');
+      console.log('❌ UserA missing metadata for:', userAMissingMetadata.map(f => f.film_slug).slice(0, 5));
+      console.log('❌ UserB missing metadata for:', userBMissingMetadata.map(f => f.film_slug).slice(0, 5));
+      
+      return {
+        error: "Some movies are missing metadata. Please wait for metadata scraping to complete.",
+        user_a: userA,
+        user_b: userB,
+        metadata_status: {
+          user_a_missing: userAMissingMetadata.length,
+          user_b_missing: userBMissingMetadata.length,
+          total_missing: userAMissingMetadata.length + userBMissingMetadata.length
+        }
+      };
+    }
+    
+    console.log('✅ All movies have metadata - proceeding with compatibility calculation');
     
     const result = calculateCompatibilityScore(userAFilms, userBFilms);
     
@@ -754,6 +787,58 @@ async function getCompatibilityScore(userA, userB) {
   }
 }
 
+// Function to check metadata readiness for compatibility calculation
+async function checkMetadataReadiness(userA, userB) {
+  try {
+    const userAFilms = await getUserFilmsData(userA);
+    const userBFilms = await getUserFilmsData(userB);
+    
+    if (userAFilms.length === 0 || userBFilms.length === 0) {
+      return {
+        ready: false,
+        error: "One or both users not found or have no films",
+        user_a: userA,
+        user_b: userB
+      };
+    }
+    
+    const userAMissingMetadata = userAFilms.filter(film => 
+      !film.genres || !film.directors || film.popularity === null
+    );
+    const userBMissingMetadata = userBFilms.filter(film => 
+      !film.genres || !film.directors || film.popularity === null
+    );
+    
+    const totalMissing = userAMissingMetadata.length + userBMissingMetadata.length;
+    const ready = totalMissing === 0;
+    
+    return {
+      ready,
+      user_a: userA,
+      user_b: userB,
+      metadata_status: {
+        user_a_total: userAFilms.length,
+        user_b_total: userBFilms.length,
+        user_a_missing: userAMissingMetadata.length,
+        user_b_missing: userBMissingMetadata.length,
+        total_missing: totalMissing,
+        missing_films: {
+          user_a: userAMissingMetadata.map(f => f.film_slug).slice(0, 10),
+          user_b: userBMissingMetadata.map(f => f.film_slug).slice(0, 10)
+        }
+      }
+    };
+  } catch (err) {
+    console.error('Error checking metadata readiness:', err);
+    return {
+      ready: false,
+      error: err.message,
+      user_a: userA,
+      user_b: userB
+    };
+  }
+}
+
 module.exports = {
   getCompatibilityScore,
   calculateCompatibilityScore,
@@ -766,5 +851,6 @@ module.exports = {
   calculateAveragePopularity,
   calculateFavoriteCommonGenres,
   calculateFavoriteCommonDirectors,
-  getCommonFilmsStats
+  getCommonFilmsStats,
+  checkMetadataReadiness
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { getAllWatchedMovies, getFilmMetadataFromLetterboxd } = require('../scraper/letterboxdScraper.cjs');
 const supabase = require('./supabaseClient.cjs');
-const { getCompatibilityScore } = require('./compatibility.cjs');
+const { getCompatibilityScore, checkMetadataReadiness } = require('./compatibility.cjs');
 const { findCommonMovies, getCommonMoviesSummary, findBiggestDisagreementMovie } = require('./commonMovies.cjs');
 
 const app = express();
@@ -387,6 +387,86 @@ app.get('/api/status', (req, res) => {
     ongoingScrapes: Array.from(ongoingScrapes),
     totalOngoing: ongoingScrapes.size
   });
+});
+
+// Metadata readiness endpoint
+app.post('/api/metadata-ready', async (req, res) => {
+  try {
+    const { user_a, user_b } = req.body;
+    
+    if (!user_a || !user_b) {
+      return res.status(400).json({ error: 'Both user_a and user_b are required' });
+    }
+    
+    console.log(`Checking metadata readiness for ${user_a} vs ${user_b}`);
+    
+    const readiness = await checkMetadataReadiness(user_a, user_b);
+    
+    res.json(readiness);
+  } catch (error) {
+    console.error('Error checking metadata readiness:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Force metadata scraping for specific films
+app.post('/api/scrape-metadata', async (req, res) => {
+  try {
+    const { film_slugs } = req.body;
+    
+    if (!film_slugs || !Array.isArray(film_slugs)) {
+      return res.status(400).json({ error: 'film_slugs array is required' });
+    }
+    
+    console.log(`🔍 Force scraping metadata for ${film_slugs.length} films:`, film_slugs);
+    
+    const results = [];
+    
+    for (const slug of film_slugs) {
+      try {
+        console.log(`📊 Scraping metadata for: ${slug}`);
+        const metadata = await getFilmMetadataFromLetterboxd(slug);
+        
+        if (metadata) {
+          const { error: upsertError } = await supabase.from('films').upsert(metadata, { onConflict: ['film_slug'] });
+          if (upsertError) {
+            console.error(`❌ Database error for ${slug}:`, upsertError);
+            results.push({ slug, success: false, error: upsertError.message });
+          } else {
+            console.log(`✅ Successfully scraped and stored metadata for: ${slug}`);
+            results.push({ slug, success: true, metadata });
+          }
+        } else {
+          console.warn(`❌ No metadata found for: ${slug}`);
+          results.push({ slug, success: false, error: 'No metadata found' });
+        }
+        
+        // Small delay between requests
+        await new Promise(r => setTimeout(r, 500));
+        
+      } catch (err) {
+        console.error(`❌ Error scraping ${slug}:`, err.message);
+        results.push({ slug, success: false, error: err.message });
+      }
+    }
+    
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    console.log(`🎯 Metadata scraping complete: ${successful} successful, ${failed} failed`);
+    
+    res.json({
+      success: true,
+      total_requested: film_slugs.length,
+      successful,
+      failed,
+      results
+    });
+    
+  } catch (error) {
+    console.error('Error in metadata scraping:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Add error handling to prevent crashes

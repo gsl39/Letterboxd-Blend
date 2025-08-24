@@ -230,44 +230,112 @@ export default function BlendResultsPage() {
     checkAndScrapeIfNeeded();
   }, [handles.user_b, blendId, hasStartedScraping]);
 
-  // Fetch compatibility
+  // Check metadata readiness and fetch compatibility
   useEffect(() => {
-    async function fetchCompatibility() {
+    async function checkMetadataAndFetchCompatibility() {
       if (!handles.user_a || !handles.user_b || !scrapingComplete) return;
       
-      console.log('Fetching compatibility for:', handles.user_a, 'vs', handles.user_b);
+      console.log('🔍 Checking metadata readiness for:', handles.user_a, 'vs', handles.user_b);
       setCalculating(true);
       
       try {
-        const response = await fetch(`${BACKEND_URL}/api/compatibility`, {
+        // First, check if metadata is ready
+        const readinessResponse = await fetch(`${BACKEND_URL}/api/metadata-ready`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_a: handles.user_a,
             user_b: handles.user_b
           })
         });
         
-        console.log('Response status:', response.status);
+        if (!readinessResponse.ok) {
+          throw new Error('Failed to check metadata readiness');
+        }
+        
+        const readiness = await readinessResponse.json();
+        console.log('📊 Metadata readiness check:', readiness);
+        
+        if (!readiness.ready) {
+          console.log('❌ Metadata not ready, missing:', readiness.metadata_status.total_missing);
+          
+          // Get all missing film slugs
+          const allMissingSlugs = [
+            ...readiness.metadata_status.missing_films.user_a,
+            ...readiness.metadata_status.missing_films.user_b
+          ];
+          
+          if (allMissingSlugs.length > 0) {
+            console.log('🔍 Scraping metadata for missing films:', allMissingSlugs);
+            
+            // Call metadata scraper
+            const scrapeResponse = await fetch(`${BACKEND_URL}/api/scrape-metadata`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ film_slugs: allMissingSlugs })
+            });
+            
+            if (scrapeResponse.ok) {
+              const scrapeResult = await scrapeResponse.json();
+              console.log('✅ Metadata scraping result:', scrapeResult);
+              
+              // Wait a bit for database to update, then check again
+              setTimeout(() => checkMetadataAndFetchCompatibility(), 2000);
+              return;
+            } else {
+              console.error('❌ Metadata scraping failed');
+            }
+          }
+          
+          // If we can't scrape, show error
+          setCompatibility({ 
+            error: "Some movies are missing metadata. Please try again later.",
+            user_a: handles.user_a,
+            user_b: handles.user_b
+          });
+          setCalculating(false);
+          return;
+        }
+        
+        console.log('✅ All metadata ready, fetching compatibility');
+        
+        // Now fetch compatibility
+        const response = await fetch(`${BACKEND_URL}/api/compatibility`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_a: handles.user_a,
+            user_b: handles.user_b
+          })
+        });
         
         if (response.ok) {
           const data = await response.json();
-          console.log('Compatibility data received:', data);
+          console.log('✅ Compatibility data received:', data);
           setCompatibility(data);
-          // Don't trigger animation here - wait for all data to load
         } else {
           const errorText = await response.text();
-          console.error('Failed to fetch compatibility:', response.status, errorText);
+          console.error('❌ Failed to fetch compatibility:', response.status, errorText);
+          setCompatibility({ 
+            error: "Failed to calculate compatibility",
+            user_a: handles.user_a,
+            user_b: handles.user_b
+          });
         }
+        
       } catch (error) {
-        console.error('Error fetching compatibility:', error);
+        console.error('❌ Error in metadata/compatibility flow:', error);
+        setCompatibility({ 
+          error: "Error checking metadata or calculating compatibility",
+          user_a: handles.user_a,
+          user_b: handles.user_b
+        });
       }
-      // Don't set calculating to false here - wait for all data to load
+      
+      setCalculating(false);
     }
 
-    fetchCompatibility();
+    checkMetadataAndFetchCompatibility();
   }, [handles.user_a, handles.user_b, scrapingComplete]);
 
   // Cleanup animation on unmount
