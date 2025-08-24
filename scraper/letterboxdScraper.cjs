@@ -162,7 +162,6 @@ async function getFilmMetadataFromLetterboxd(slug) {
 
     return {
       film_slug: slug,
-      film_title: $('h1.film-title').text().trim() || slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
       year,
       poster_url: poster_url || '',
       genres: genres.length ? genres : null,
