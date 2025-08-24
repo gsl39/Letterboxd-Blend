@@ -31,6 +31,20 @@ export default function ScrapingPage() {
         
         setHandles({ user_a: data.user_a, user_b: data.user_b });
         
+        // Check if user_b already has movies (no need to scrape)
+        const { data: userBMovies } = await supabase
+          .from('user_films_with_films')
+          .select('film_slug')
+          .eq('user_handle', data.user_b)
+          .limit(1);
+        
+        if (userBMovies && userBMovies.length > 0) {
+          // User B already has movies, check if both users are ready
+          setScrapingStatus('Checking if both users are ready...');
+          await checkBothUsersReady();
+          return;
+        }
+        
         // Start scraping for user_b
         console.log('Starting scraping for user_b:', data.user_b);
         setIsScraping(true);
@@ -61,12 +75,10 @@ export default function ScrapingPage() {
           if (response.ok) {
             console.log('Scraping completed for user_b:', data.user_b);
             setScrapingProgress(100);
-            setScrapingStatus('Scraping complete! Redirecting to results...');
+            setScrapingStatus('Scraping complete! Checking if both users are ready...');
             
-            // Wait a moment to show completion, then redirect
-            setTimeout(() => {
-              navigate(`/blend/${blendId}/results`);
-            }, 1500);
+            // Now check if both users are ready
+            await checkBothUsersReady();
           } else {
             throw new Error('Scraping failed');
           }
@@ -87,8 +99,44 @@ export default function ScrapingPage() {
       }
     }
     
+    // Helper function to check if both users are ready
+    async function checkBothUsersReady() {
+      try {
+        // Check if both users have movies
+        const [userAMovies, userBMovies] = await Promise.all([
+          supabase
+            .from('user_films_with_films')
+            .select('film_slug')
+            .eq('user_handle', handles.user_a || '')
+            .limit(1),
+          supabase
+            .from('user_films_with_films')
+            .select('film_slug')
+            .eq('user_handle', handles.user_b || '')
+            .limit(1)
+        ]);
+        
+        if (userAMovies.data && userAMovies.data.length > 0 && 
+            userBMovies.data && userBMovies.data.length > 0) {
+          setScrapingStatus('Both users ready! Redirecting to results...');
+          
+          // Wait a moment to show completion, then redirect
+          setTimeout(() => {
+            navigate(`/blend/${blendId}/results`);
+          }, 1500);
+        } else {
+          setScrapingStatus('Waiting for both users to be ready...');
+          // Check again in 2 seconds
+          setTimeout(checkBothUsersReady, 2000);
+        }
+      } catch (error) {
+        console.error('Error checking user readiness:', error);
+        setScrapingStatus('Error checking readiness. Please try again.');
+      }
+    }
+    
     fetchHandlesAndStartScraping();
-  }, [blendId, navigate]);
+  }, [blendId, navigate, handles.user_a, handles.user_b]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 font-manrope">

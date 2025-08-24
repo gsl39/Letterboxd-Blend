@@ -30,7 +30,7 @@ export default function StartBlendPage() {
     });
   };
 
-  useEffect(() => {
+    useEffect(() => {
     if (!blendId) return;
     const interval = setInterval(async () => {
       const { data } = await supabase
@@ -38,10 +38,11 @@ export default function StartBlendPage() {
         .select("user_b")
         .eq("blend_id", blendId)
         .single();
-              if (data && data.user_b) {
-          clearInterval(interval);
-          navigate(`/blend/${blendId}/scraping`);
-        }
+      if (data && data.user_b) {
+        clearInterval(interval);
+        // Redirect to scraping page - it will coordinate both users
+        navigate(`/blend/${blendId}/scraping`);
+      }
     }, 2000);
     return () => clearInterval(interval);
   }, [blendId, navigate]);
