@@ -1,11 +1,10 @@
--- 🎬 Letterboxd Blend Database Setup
--- Run this script in your Supabase SQL editor
+-- Letterboxd Blend Database Setup
+-- This script creates the necessary tables for the Letterboxd Blend application
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
     user_handle VARCHAR(255) PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create films table
@@ -14,11 +13,10 @@ CREATE TABLE IF NOT EXISTS films (
     film_title VARCHAR(500) NOT NULL,
     year INTEGER,
     director VARCHAR(255),
-    genres TEXT[], -- Array of genre strings
-    popularity INTEGER,
+    genres TEXT[],
+    popularity INTEGER DEFAULT 0,
     poster_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create user_films table (junction table)
@@ -29,7 +27,6 @@ CREATE TABLE IF NOT EXISTS user_films (
     rating DECIMAL(2,1) CHECK (rating >= 0 AND rating <= 5), -- 0.0 to 5.0
     liked BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_handle, film_slug)
 );
 
@@ -44,7 +41,6 @@ CREATE TABLE IF NOT EXISTS blends (
     rating_alignment DECIMAL(5,2),
     obscurity_alignment DECIMAL(5,2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_a, user_b)
 );
 
@@ -83,36 +79,6 @@ CREATE POLICY "Allow all operations on users" ON users FOR ALL USING (true);
 CREATE POLICY "Allow all operations on films" ON films FOR ALL USING (true);
 CREATE POLICY "Allow all operations on user_films" ON user_films FOR ALL USING (true);
 CREATE POLICY "Allow all operations on blends" ON blends FOR ALL USING (true);
-
--- Create function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create triggers to automatically update updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_films_updated_at BEFORE UPDATE ON films
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_user_films_updated_at BEFORE UPDATE ON user_films
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_blends_updated_at BEFORE UPDATE ON blends
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- Insert some sample data (optional)
--- INSERT INTO users (user_handle) VALUES ('example_user');
--- INSERT INTO films (film_slug, film_title, year, director) VALUES ('example-film', 'Example Film', 2024, 'Example Director');
-
--- Grant necessary permissions (adjust based on your setup)
--- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO authenticated;
--- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 COMMENT ON TABLE users IS 'Letterboxd user accounts';
 COMMENT ON TABLE films IS 'Movie metadata and information';

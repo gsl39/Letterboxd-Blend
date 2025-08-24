@@ -62,47 +62,36 @@ export default function BlendResultsPage() {
 
   // Helper function to get obscurity description based on score
   const getObscurityDescription = useCallback((obscurityScore, userAPopularity, userBPopularity) => {
-    console.log('🔍 getObscurityDescription called with:', { obscurityScore, userAPopularity, userBPopularity });
-    
     if (obscurityScore >= 8) {
       if (userAPopularity > 1500000 && userBPopularity > 1500000) {
-        console.log('✅ High obscurity + both blockbuster bros');
         return "You're both certified blockbuster bros. Your idea of 'indie cinema' is probably 'The Dark Knight.'";
       } else {
-        console.log('✅ High obscurity + arthouse scene');
         return "You're both deep in the arthouse scene. You both drove 18 hours to watch The Brutalist in 70mm";
       }
     }
     
     if (obscurityScore >= 6) {
       if (userAPopularity > 1500000 && userBPopularity > 1500000) {
-        console.log('✅ Medium obscurity + both blockbuster bros - MCU tagline');
         return "Sometimes you're in sync,\nsometimes you're arguing over which MCU Phase deserves popcorn.";
       } else if (userAPopularity > 1500000 && userBPopularity > 1500000) {
-        console.log('✅ Medium obscurity + both mainstream');
         return "You both know your way around a multiplex,\nbut one of you has a secret Criterion subscription.";
       } else {
-        console.log('✅ Medium obscurity + mixed scene');
         return "You nod at each other across the festival line,\nthen disappear into different theaters.";
       }
     }
     
     if (obscurityScore >= 4) {
       if (userAPopularity > 1000000 && userBPopularity > 1000000) {
-        console.log('✅ Low obscurity + both mainstream');
         return "You're both mainstream moviegoers. Sometimes you discover the same hidden gem,\nother times one of you is watching 'Barbie' while the other is watching 'Perfect Blue.'";
       } else {
-        console.log('✅ Low obscurity + mixed tastes');
         return "You're moderately aligned. Sometimes you both discover the same hidden gem,\nother times one of you is watching 'Barbie' while the other is watching 'Perfect Blue.'";
       }
     }
     
     // Low alignment (0-4)
     if (Math.random() > 0.5) {
-      console.log('✅ Very low obscurity - option 1');
       return "One of you lives in the Criterion closet,\nthe other in line for the new Star Wars.";
     } else {
-      console.log('✅ Very low obscurity - option 2');
       return "One of you is Cannes, the other is Comic-Con.";
     }
   }, []);
@@ -293,15 +282,13 @@ export default function BlendResultsPage() {
   // Fetch common movies
   useEffect(() => {
     if (handles.user_a && handles.user_b && scrapingComplete) {
-      console.log('Fetching common movies between:', handles.user_a, 'and', handles.user_b);
+
       
       let commonMoviesLoaded = false;
       let disagreementMovieLoaded = false;
       
       const checkAllDataLoaded = () => {
-        console.log('🔍 checkAllDataLoaded called:', { commonMoviesLoaded, disagreementMovieLoaded });
         if (commonMoviesLoaded && disagreementMovieLoaded) {
-          console.log('✅ All data loaded, setting allDataLoaded=true and calculating=false');
           setAllDataLoaded(true);
           setCalculating(false);
         }
@@ -320,7 +307,7 @@ export default function BlendResultsPage() {
       })
       .then(response => response.json())
       .then(data => {
-        console.log('Common movies from backend:', data);
+
         setCommonMovies(data.movies || []);
         commonMoviesLoaded = true;
         checkAllDataLoaded();
@@ -345,7 +332,7 @@ export default function BlendResultsPage() {
       })
       .then(response => response.json())
       .then(data => {
-        console.log('Disagreement movie from backend:', data);
+
         setDisagreementMovie(data.movie || null);
         disagreementMovieLoaded = true;
         checkAllDataLoaded();
@@ -361,9 +348,7 @@ export default function BlendResultsPage() {
 
   // Reset animation states when all data is loaded
   useEffect(() => {
-    console.log('🔍 Score reveal useEffect:', { allDataLoaded, hasCompatibility: !!compatibility });
     if (allDataLoaded && compatibility) {
-      console.log('✅ Starting score reveal animation');
       // Start the complete animation sequence
       setTimeout(() => {
         setScoreRevealed(true);
@@ -419,7 +404,7 @@ export default function BlendResultsPage() {
 
       {(() => {
         const shouldShowLoading = (calculating || isScraping) && !allDataLoaded;
-        console.log('🔍 Loading condition:', { calculating, isScraping, allDataLoaded, shouldShowLoading });
+
         return shouldShowLoading;
       })() && (
         <div className="w-full max-w-4xl text-center">
@@ -473,14 +458,7 @@ export default function BlendResultsPage() {
       {/* Animated score display */}
       {(() => {
         const shouldShowScore = compatibility && !compatibility.error && scoreRevealed && compatibility.total_score !== undefined && allDataLoaded;
-        console.log('🔍 Score display condition:', { 
-          hasCompatibility: !!compatibility, 
-          noError: !compatibility?.error, 
-          scoreRevealed, 
-          hasTotalScore: compatibility?.total_score !== undefined, 
-          allDataLoaded, 
-          shouldShowScore 
-        });
+
         return shouldShowScore;
       })() && (
         <div className="w-full max-w-4xl text-center relative">
