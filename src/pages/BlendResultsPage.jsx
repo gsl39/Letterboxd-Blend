@@ -182,53 +182,8 @@ export default function BlendResultsPage() {
     fetchHandles();
   }, [blendId]);
 
-  // Handle scraping for user_b if needed (runs after handles are loaded)
-  const [scrapingComplete, setScrapingComplete] = useState(false);
-  const [isScraping, setIsScraping] = useState(false);
-  const [hasStartedScraping, setHasStartedScraping] = useState(false);
-  
-  useEffect(() => {
-    if (!handles.user_b || hasStartedScraping) return;
-    
-    async function checkAndScrapeIfNeeded() {
-      // Check if user_b already has movies in the database
-      const { data: userBMovies } = await supabase
-        .from('user_films_with_films')
-        .select('film_slug')
-        .eq('user_handle', handles.user_b)
-        .limit(1);
-      
-      // If no movies found, start scraping
-      if (!userBMovies || userBMovies.length === 0) {
-        console.log('Starting scraping for user_b:', handles.user_b);
-        setHasStartedScraping(true);
-        setIsScraping(true);
-        try {
-          await fetch(`${BACKEND_URL}/api/scrape`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              handle: handles.user_b, 
-              blend_id: blendId, 
-              user: 'b' 
-            }),
-          });
-          console.log('Scraping completed for user_b:', handles.user_b);
-          setIsScraping(false);
-          setScrapingComplete(true);
-        } catch (error) {
-          console.error('Scraping failed:', error);
-          setIsScraping(false);
-          setScrapingComplete(true); // Mark as complete even if failed
-        }
-      } else {
-        // User already has movies, mark scraping as complete
-        setScrapingComplete(true);
-      }
-    }
-    
-    checkAndScrapeIfNeeded();
-  }, [handles.user_b, blendId, hasStartedScraping]);
+  // Set scrapingComplete to true since scraping is handled by ScrapingPage
+  const [scrapingComplete, setScrapingComplete] = useState(true);
 
   // Check metadata readiness and fetch compatibility
   useEffect(() => {
@@ -471,7 +426,7 @@ export default function BlendResultsPage() {
       )}
 
       {(() => {
-        const shouldShowLoading = (calculating || isScraping) && !allDataLoaded;
+        const shouldShowLoading = calculating && !allDataLoaded;
 
         return shouldShowLoading;
       })() && (
@@ -515,9 +470,9 @@ export default function BlendResultsPage() {
             
             {/* Loading text overlay */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-2xl font-manrope text-gray-600 animate-pulse">
-                {isScraping ? 'Scraping movies from Letterboxd...' : 'Calculating your cinematic compatibility...'}
-              </div>
+                          <div className="text-2xl font-manrope text-gray-600 animate-pulse">
+              Calculating your cinematic compatibility...
+            </div>
             </div>
           </div>
         </div>

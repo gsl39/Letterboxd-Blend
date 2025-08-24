@@ -30,14 +30,14 @@ export default function JoinBlendPage() {
         // Remove @ symbol if username starts with it
         const cleanHandle = handle.startsWith('@') ? handle.slice(1) : handle;
         
-        // Update the database and navigate immediately
+        // Update the database and navigate to scraping page
         await supabase
             .from('blends')
             .update({ user_b: cleanHandle })
             .eq('blend_id', blendId);
 
-        // Navigate immediately - no scraping delay
-        navigate(`/blend/${blendId}/results`);
+        // Navigate to scraping page instead of results
+        navigate(`/blend/${blendId}/scraping`);
     };
 
     return (
