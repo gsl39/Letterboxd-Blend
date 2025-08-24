@@ -38,10 +38,10 @@ export default function StartBlendPage() {
         .select("user_b")
         .eq("blend_id", blendId)
         .single();
-      if (data && data.user_b) {
-        clearInterval(interval);
-        navigate(`/blend/${blendId}/results`);
-      }
+              if (data && data.user_b) {
+          clearInterval(interval);
+          navigate(`/blend/${blendId}/scraping`);
+        }
     }, 2000);
     return () => clearInterval(interval);
   }, [blendId, navigate]);
