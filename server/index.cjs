@@ -15,9 +15,14 @@ const ongoingScrapes = new Set();
 
 
 app.post('/api/scrape', async (req, res) => {
-  console.log('Received /api/scrape request', req.body);
+  console.log('🚀 === SCRAPING ENDPOINT CALLED ===');
+  console.log('📝 Request body:', req.body);
   const { handle } = req.body;
-  if (!handle) return res.status(400).json({ error: 'Missing handle' });
+  if (!handle) {
+    console.log('❌ Missing handle in request');
+    return res.status(400).json({ error: 'Missing handle' });
+  }
+  console.log('✅ Handle received:', handle);
 
   // Prevent duplicate scraping for the same user
   if (ongoingScrapes.has(handle)) {

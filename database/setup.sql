@@ -10,13 +10,12 @@ CREATE TABLE IF NOT EXISTS users (
 -- Create films table
 CREATE TABLE IF NOT EXISTS films (
     film_slug VARCHAR(255) PRIMARY KEY,
-    film_title VARCHAR(500) NOT NULL,
     year INTEGER,
-    director VARCHAR(255),
-    genres TEXT[],
-    popularity INTEGER DEFAULT 0,
     poster_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    genres TEXT[],
+    directors TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    popularity INTEGER DEFAULT 0
 );
 
 -- Create user_films table (junction table)
@@ -60,7 +59,7 @@ SELECT
     uf.liked,
     f.film_title,
     f.year,
-    f.director,
+    f.directors,
     f.genres,
     f.popularity,
     f.poster_url
