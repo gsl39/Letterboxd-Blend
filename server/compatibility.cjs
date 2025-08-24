@@ -592,20 +592,20 @@ async function getCommonFilmsStats(userA, userB) {
       console.log('Debug [NEW]: Sample common film structure:', {
         film_slug: commonFilms[0].film_slug,
         rating: commonFilms[0].rating,
-        films_genres: commonFilms[0].films_genres,
-        film_directors: commonFilms[0].film_directors,
-        has_genres: !!commonFilms[0].films_genres,
-        has_directors: !!commonFilms[0].film_directors,
-        genres_type: typeof commonFilms[0].films_genres,
-        directors_type: typeof commonFilms[0].film_directors
+        genres: commonFilms[0].genres,
+        directors: commonFilms[0].directors,
+        has_genres: !!commonFilms[0].genres,
+        has_directors: !!commonFilms[0].directors,
+        genres_type: typeof commonFilms[0].genres,
+        directors_type: typeof commonFilms[0].directors
       });
     }
     
     // Calculate favorite genres from common films
     const genreStats = new Map();
     commonFilms.forEach(film => {
-      if (film.rating !== null && film.films_genres && Array.isArray(film.films_genres)) {
-        film.films_genres.forEach(genre => {
+      if (film.rating !== null && film.genres && Array.isArray(film.genres)) {
+        film.genres.forEach(genre => {
           const genreName = genre.trim();
           if (!genreStats.has(genreName)) {
             genreStats.set(genreName, { totalRating: 0, count: 0 });
@@ -620,8 +620,8 @@ async function getCommonFilmsStats(userA, userB) {
     // Calculate favorite directors from common films
     const directorStats = new Map();
     commonFilms.forEach(film => {
-      if (film.rating !== null && film.film_directors && Array.isArray(film.film_directors)) {
-        film.film_directors.forEach(director => {
+      if (film.rating !== null && film.directors && Array.isArray(film.directors)) {
+        film.directors.forEach(director => {
           const directorName = director.trim();
           if (!directorStats.has(directorName)) {
             directorStats.set(directorName, { totalRating: 0, count: 0 });
