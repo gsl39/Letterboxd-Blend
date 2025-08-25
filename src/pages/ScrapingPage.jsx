@@ -12,7 +12,7 @@ export default function ScrapingPage() {
   const [scrapingProgress, setScrapingProgress] = useState(0);
   const [scrapingStatus, setScrapingStatus] = useState('Preparing to scrape...');
 
-  // Fetch handles and start scraping
+  // Fetch handles and start scraping with strict verification
   useEffect(() => {
     async function fetchHandlesAndStartScraping() {
       try {
@@ -31,21 +31,48 @@ export default function ScrapingPage() {
         
         setHandles({ user_a: data.user_a, user_b: data.user_b });
         
-        // Check if user_b already has movies (no need to scrape)
-        const { data: userBMovies } = await supabase
+        // STRICT CHECK 1: Verify user A has movies (should already be scraped)
+        setScrapingStatus('Verifying User A movies...');
+        const { data: userAMovies, error: userAError } = await supabase
           .from('user_films_with_films')
           .select('film_slug')
-          .eq('user_handle', data.user_b)
-          .limit(1);
+          .eq('user_handle', data.user_a);
         
-        if (userBMovies && userBMovies.length > 0) {
-          // User B already has movies, check if both users are ready
-          setScrapingStatus('Checking if both users are ready...');
-          await checkBothUsersReady();
+        if (userAError) {
+          console.error('Error checking User A movies:', userAError);
+          setScrapingStatus('Error checking User A. Please try again.');
           return;
         }
         
-        // Start scraping for user_b
+        if (!userAMovies || userAMovies.length === 0) {
+          setScrapingStatus('User A has no movies. Please start over.');
+          setTimeout(() => navigate(`/blend/${blendId}`), 3000);
+          return;
+        }
+        
+        console.log(`✅ User A has ${userAMovies.length} movies`);
+        
+        // STRICT CHECK 2: Check if user B already has movies
+        setScrapingStatus('Checking User B movies...');
+        const { data: userBMovies, error: userBError } = await supabase
+          .from('user_films_with_films')
+          .select('film_slug')
+          .eq('user_handle', data.user_b);
+        
+        if (userBError) {
+          console.error('Error checking User B movies:', userBError);
+          setScrapingStatus('Error checking User B. Please try again.');
+          return;
+        }
+        
+        if (userBMovies && userBMovies.length > 0) {
+          console.log(`✅ User B already has ${userBMovies.length} movies`);
+          setScrapingStatus('Both users ready! Verifying metadata...');
+          await verifyBothUsersComplete();
+          return;
+        }
+        
+        // STRICT CHECK 3: User B needs scraping - start the process
         console.log('Starting scraping for user_b:', data.user_b);
         setIsScraping(true);
         setScrapingStatus('Scraping movies from Letterboxd...');
@@ -75,64 +102,182 @@ export default function ScrapingPage() {
           if (response.ok) {
             console.log('Scraping completed for user_b:', data.user_b);
             setScrapingProgress(100);
-            setScrapingStatus('Scraping complete! Checking if both users are ready...');
+            setScrapingStatus('Scraping complete! Verifying data...');
             
-            // Now check if both users are ready
-            await checkBothUsersReady();
+            // STRICT CHECK 4: Verify scraping actually worked
+            await verifyScrapingSuccess(data.user_b);
           } else {
-            throw new Error('Scraping failed');
+            const errorText = await response.text();
+            throw new Error(`Scraping failed: ${errorText}`);
           }
         } catch (error) {
           console.error('Scraping failed:', error);
-          setScrapingStatus('Scraping failed. Please try again.');
+          setScrapingStatus(`Scraping failed: ${error.message}`);
           setScrapingProgress(0);
           
           // Show error for a few seconds, then redirect back
           setTimeout(() => {
             navigate(`/blend/${blendId}`);
-          }, 3000);
+          }, 5000);
         }
         
       } catch (error) {
         console.error('Error:', error);
-        navigate(`/blend/${blendId}`);
+        setScrapingStatus(`Error: ${error.message}`);
+        setTimeout(() => navigate(`/blend/${blendId}`), 3000);
       }
     }
     
-    // Helper function to check if both users are ready
-    async function checkBothUsersReady() {
-      try {
-        // Check if both users have movies
-        const [userAMovies, userBMovies] = await Promise.all([
-          supabase
-            .from('user_films_with_films')
-            .select('film_slug')
-            .eq('user_handle', handles.user_a || '')
-            .limit(1),
-          supabase
-            .from('user_films_with_films')
-            .select('film_slug')
-            .eq('user_handle', handles.user_b || '')
-            .limit(1)
-        ]);
+    // STRICT VERIFICATION: Verify scraping actually worked
+    async function verifyScrapingSuccess(userBHandle) {
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      const verify = async () => {
+        attempts++;
+        setScrapingStatus(`Verifying scraping success... (attempt ${attempts}/${maxAttempts})`);
         
-        if (userAMovies.data && userAMovies.data.length > 0 && 
-            userBMovies.data && userBMovies.data.length > 0) {
-          setScrapingStatus('Both users ready! Redirecting to results...');
+        try {
+          // Check if user B now has movies
+          const { data: userBMovies, error: userBError } = await supabase
+            .from('user_films_with_films')
+            .select('film_slug')
+            .eq('user_handle', userBHandle);
           
-          // Wait a moment to show completion, then redirect
-          setTimeout(() => {
-            navigate(`/blend/${blendId}/results`);
-          }, 1500);
-        } else {
-          setScrapingStatus('Waiting for both users to be ready...');
-          // Check again in 2 seconds
-          setTimeout(checkBothUsersReady, 2000);
+          if (userBError) {
+            throw userBError;
+          }
+          
+          if (userBMovies && userBMovies.length > 0) {
+            console.log(`✅ User B now has ${userBMovies.length} movies`);
+            setScrapingStatus('Scraping verified! Checking metadata...');
+            await verifyBothUsersComplete();
+          } else {
+            if (attempts >= maxAttempts) {
+              setScrapingStatus('Scraping verification failed after multiple attempts');
+              setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+            } else {
+              setScrapingStatus(`Waiting for data to appear... (attempt ${attempts}/${maxAttempts})`);
+              setTimeout(verify, 2000);
+            }
+          }
+        } catch (error) {
+          console.error('Verification error:', error);
+          if (attempts >= maxAttempts) {
+            setScrapingStatus('Verification failed. Please try again.');
+            setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+          } else {
+            setTimeout(verify, 2000);
+          }
         }
-      } catch (error) {
-        console.error('Error checking user readiness:', error);
-        setScrapingStatus('Error checking readiness. Please try again.');
-      }
+      };
+      
+      await verify();
+    }
+    
+    // STRICT VERIFICATION: Verify both users are completely ready
+    async function verifyBothUsersComplete() {
+      let attempts = 0;
+      const maxAttempts = 15;
+      
+      const verify = async () => {
+        attempts++;
+        setScrapingStatus(`Verifying both users complete... (attempt ${attempts}/${maxAttempts})`);
+        
+        try {
+          // STRICT CHECK 5: Use backend endpoint to verify user status
+          setScrapingStatus('Checking user A status via backend...');
+          const userAResponse = await fetch(`${BACKEND_URL}/api/user-scraping-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ handle: handles.user_a })
+          });
+          
+          if (!userAResponse.ok) {
+            throw new Error('Failed to check User A status');
+          }
+          
+          const userAStatus = await userAResponse.json();
+          console.log('User A status:', userAStatus);
+          
+          if (!userAStatus.hasMovies) {
+            setScrapingStatus('User A has no movies. Please start over.');
+            setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+            return;
+          }
+          
+          setScrapingStatus('Checking user B status via backend...');
+          const userBResponse = await fetch(`${BACKEND_URL}/api/user-scraping-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ handle: handles.user_b })
+          });
+          
+          if (!userBResponse.ok) {
+            throw new Error('Failed to check User B status');
+          }
+          
+          const userBStatus = await userBResponse.json();
+          console.log('User B status:', userBStatus);
+          
+          if (!userBStatus.hasMovies) {
+            setScrapingStatus('User B has no movies. Please try again.');
+            if (attempts >= maxAttempts) {
+              setScrapingStatus('User B verification timeout. Please try again.');
+              setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+            } else {
+              setTimeout(verify, 3000);
+            }
+            return;
+          }
+          
+          console.log(`📊 User A: ${userAStatus.movieCount} movies (${userAStatus.status}), User B: ${userBStatus.movieCount} movies (${userBStatus.status})`);
+          
+          // STRICT CHECK 6: Verify metadata is ready via backend
+          setScrapingStatus('Checking metadata readiness via backend...');
+          const metadataResponse = await fetch(`${BACKEND_URL}/api/metadata-ready`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_a: handles.user_a,
+              user_b: handles.user_b
+            })
+          });
+          
+          if (metadataResponse.ok) {
+            const metadataStatus = await metadataResponse.json();
+            console.log('Metadata status:', metadataStatus);
+            
+            if (metadataStatus.ready) {
+              setScrapingStatus('🎯 ALL SYSTEMS READY! Redirecting to results...');
+              setTimeout(() => {
+                navigate(`/blend/${blendId}/results`);
+              }, 2000);
+              return;
+            } else {
+              setScrapingStatus(`Metadata not ready: ${metadataStatus.metadata_status.total_missing} missing`);
+              if (attempts >= maxAttempts) {
+                setScrapingStatus('Metadata verification timeout. Please try again.');
+                setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+              } else {
+                setTimeout(verify, 3000);
+              }
+            }
+          } else {
+            throw new Error('Failed to check metadata readiness');
+          }
+        } catch (error) {
+          console.error('Verification error:', error);
+          if (attempts >= maxAttempts) {
+            setScrapingStatus('Verification failed. Please try again.');
+            setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+          } else {
+            setTimeout(verify, 3000);
+          }
+        }
+      };
+      
+      await verify();
     }
     
     fetchHandlesAndStartScraping();

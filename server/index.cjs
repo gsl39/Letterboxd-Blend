@@ -250,6 +250,60 @@ app.post('/api/test-popularity', async (req, res) => {
   }
 });
 
+// New endpoint to check if a user's scraping is complete
+app.post('/api/user-scraping-status', async (req, res) => {
+  try {
+    const { handle } = req.body;
+    if (!handle) {
+      return res.status(400).json({ error: 'Missing handle' });
+    }
+    
+    console.log(`Checking scraping status for user: ${handle}`);
+    
+    // Check if user has movies in user_films
+    const { data: userFilms, error: userFilmsError } = await supabase
+      .from('user_films')
+      .select('film_slug')
+      .eq('user_handle', handle);
+    
+    if (userFilmsError) {
+      throw userFilmsError;
+    }
+    
+    const movieCount = userFilms?.length || 0;
+    const hasMovies = movieCount > 0;
+    
+    // Check if movies have metadata
+    let metadataComplete = false;
+    if (hasMovies) {
+      const { data: filmsWithMetadata, error: metadataError } = await supabase
+        .from('films')
+        .select('film_slug, genres, directors, popularity')
+        .in('film_slug', userFilms.map(uf => uf.film_slug).slice(0, 50)); // Check first 50
+      
+      if (!metadataError && filmsWithMetadata) {
+        const completeMetadata = filmsWithMetadata.filter(f => 
+          f.genres && f.directors && f.popularity !== null
+        );
+        metadataComplete = completeMetadata.length === filmsWithMetadata.length;
+      }
+    }
+    
+    res.json({
+      success: true,
+      handle,
+      movieCount,
+      hasMovies,
+      metadataComplete,
+      status: hasMovies ? (metadataComplete ? 'complete' : 'partial') : 'none'
+    });
+    
+  } catch (err) {
+    console.error('Error checking user scraping status:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // New endpoint to update popularity for all existing films
 app.post('/api/update-popularity', async (req, res) => {
   try {
