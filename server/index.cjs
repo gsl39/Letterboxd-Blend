@@ -12,17 +12,45 @@ app.use(express.json());
 // Track ongoing scraping operations to prevent duplicates
 const ongoingScrapes = new Set();
 
+// Track scraping completion status for each blend to enforce sequential processing
+const scrapingLocks = new Map(); // blend_id -> { user_a_complete: boolean, user_b_complete: boolean }
 
+
+
+// Helper function to check if scraping is complete for a blend
+function isScrapingComplete(blendId) {
+  const lock = scrapingLocks.get(blendId);
+  if (!lock) return false;
+  return lock.user_a_complete && lock.user_b_complete;
+}
+
+// Helper function to mark scraping complete for a user in a blend
+function markScrapingComplete(blendId, user) {
+  if (!scrapingLocks.has(blendId)) {
+    scrapingLocks.set(blendId, { user_a_complete: false, user_b_complete: false });
+  }
+  const lock = scrapingLocks.get(blendId);
+  if (user === 'a') {
+    lock.user_a_complete = true;
+  } else if (user === 'b') {
+    lock.user_b_complete = true;
+  }
+  console.log(`🔒 Scraping lock updated for blend ${blendId}:`, lock);
+}
 
 app.post('/api/scrape', async (req, res) => {
   console.log('🚀 === SCRAPING ENDPOINT CALLED ===');
   console.log('📝 Request body:', req.body);
-  const { handle } = req.body;
+  const { handle, blend_id, user } = req.body;
   if (!handle) {
     console.log('❌ Missing handle in request');
     return res.status(400).json({ error: 'Missing handle' });
   }
-  console.log('✅ Handle received:', handle);
+  if (!blend_id || !user) {
+    console.log('❌ Missing blend_id or user in request');
+    return res.status(400).json({ error: 'Missing blend_id or user' });
+  }
+  console.log('✅ Handle received:', handle, 'for blend:', blend_id, 'user:', user);
 
   // Prevent duplicate scraping for the same user
   if (ongoingScrapes.has(handle)) {
@@ -57,6 +85,10 @@ app.post('/api/scrape', async (req, res) => {
     
     // Remove from ongoing scrapes
     ongoingScrapes.delete(handle);
+    
+    // Mark scraping complete for this user in this blend
+    markScrapingComplete(blend_id, user);
+    console.log(`✅ Scraping complete for ${handle} (${user}) in blend ${blend_id}`);
 
     // --- Enrich films table synchronously ---
     // Get unique film_slugs from this batch
@@ -250,6 +282,45 @@ app.post('/api/test-popularity', async (req, res) => {
   }
 });
 
+// New endpoint to check scraping status for a blend
+app.post('/api/blend-scraping-status', async (req, res) => {
+  try {
+    const { blend_id } = req.body;
+    if (!blend_id) {
+      return res.status(400).json({ error: 'Missing blend_id' });
+    }
+    
+    console.log(`Checking scraping status for blend: ${blend_id}`);
+    
+    const lock = scrapingLocks.get(blend_id);
+    if (!lock) {
+      return res.json({
+        success: true,
+        blend_id,
+        user_a_complete: false,
+        user_b_complete: false,
+        all_complete: false,
+        status: 'not_started'
+      });
+    }
+    
+    const allComplete = lock.user_a_complete && lock.user_b_complete;
+    
+    res.json({
+      success: true,
+      blend_id,
+      user_a_complete: lock.user_a_complete,
+      user_b_complete: lock.user_b_complete,
+      all_complete: allComplete,
+      status: allComplete ? 'complete' : 'in_progress'
+    });
+    
+  } catch (err) {
+    console.error('Error checking blend scraping status:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // New endpoint to check if a user's scraping is complete
 app.post('/api/user-scraping-status', async (req, res) => {
   try {
@@ -356,12 +427,31 @@ app.post('/api/update-popularity', async (req, res) => {
 // Compatibility endpoint
 app.post('/api/compatibility', async (req, res) => {
   try {
-    const { user_a, user_b } = req.body;
+    const { user_a, user_b, blend_id } = req.body;
     
     if (!user_a || !user_b) {
       return res.status(400).json({ error: 'Missing user_a or user_b' });
     }
     
+    if (!blend_id) {
+      return res.status(400).json({ error: 'Missing blend_id' });
+    }
+    
+    console.log(`🔒 Checking scraping completion for blend ${blend_id} before compatibility calculation`);
+    
+    // STRICT CHECK: Ensure scraping is complete before proceeding
+    const lock = scrapingLocks.get(blend_id);
+    if (!lock || !lock.user_a_complete || !lock.user_b_complete) {
+      console.log(`❌ Scraping not complete for blend ${blend_id}:`, lock);
+      return res.status(400).json({ 
+        error: 'Scraping not complete for both users',
+        status: 'scraping_incomplete',
+        blend_id,
+        scraping_status: lock || { user_a_complete: false, user_b_complete: false }
+      });
+    }
+    
+    console.log(`✅ Scraping complete for blend ${blend_id}, proceeding with compatibility calculation`);
     console.log(`Calculating compatibility between ${user_a} and ${user_b}`);
     
     const result = await getCompatibilityScore(user_a, user_b);
@@ -372,17 +462,36 @@ app.post('/api/compatibility', async (req, res) => {
     console.error('Error calculating compatibility:', err);
     res.status(500).json({ error: err.message });
   }
-});
+ });
 
 // Common movies endpoint
 app.post('/api/common-movies', async (req, res) => {
   try {
-    const { user_a, user_b, max_movies = 4 } = req.body;
+    const { user_a, user_b, max_movies = 4, blend_id } = req.body;
     
     if (!user_a || !user_b) {
       return res.status(400).json({ error: 'Both user_a and user_b are required' });
     }
     
+    if (!blend_id) {
+      return res.status(400).json({ error: 'Missing blend_id' });
+    }
+    
+    console.log(`🔒 Checking scraping completion for blend ${blend_id} before common movies calculation`);
+    
+    // STRICT CHECK: Ensure scraping is complete before proceeding
+    const lock = scrapingLocks.get(blend_id);
+    if (!lock || !lock.user_a_complete || !lock.user_b_complete) {
+      console.log(`❌ Scraping not complete for blend ${blend_id}:`, lock);
+      return res.status(400).json({ 
+        error: 'Scraping not complete for both users',
+        status: 'scraping_incomplete',
+        blend_id,
+        scraping_status: lock || { user_a_complete: false, user_b_complete: false }
+      });
+    }
+    
+    console.log(`✅ Scraping complete for blend ${blend_id}, proceeding with common movies calculation`);
     console.log(`Finding common movies between ${user_a} and ${user_b} (max: ${max_movies})`);
     
     const commonMovies = await findCommonMovies(user_a, user_b, max_movies);
@@ -426,12 +535,31 @@ app.post('/api/common-movies-summary', async (req, res) => {
 // Biggest disagreement movie endpoint
 app.post('/api/biggest-disagreement', async (req, res) => {
   try {
-    const { user_a, user_b } = req.body;
+    const { user_a, user_b, blend_id } = req.body;
     
     if (!user_a || !user_b) {
       return res.status(400).json({ error: 'Both user_a and user_b are required' });
     }
     
+    if (!blend_id) {
+      return res.status(400).json({ error: 'Missing blend_id' });
+    }
+    
+    console.log(`🔒 Checking scraping completion for blend ${blend_id} before disagreement calculation`);
+    
+    // STRICT CHECK: Ensure scraping is complete before proceeding
+    const lock = scrapingLocks.get(blend_id);
+    if (!lock || !lock.user_a_complete || !lock.user_b_complete) {
+      console.log(`❌ Scraping not complete for blend ${blend_id}:`, lock);
+      return res.status(400).json({ 
+        error: 'Scraping not complete for both users',
+        status: 'scraping_incomplete',
+        blend_id,
+        scraping_status: lock || { user_a_complete: false, user_b_complete: false }
+      });
+    }
+    
+    console.log(`✅ Scraping complete for blend ${blend_id}, proceeding with disagreement calculation`);
     console.log(`Finding biggest disagreement movie between ${user_a} and ${user_b}`);
     
     const disagreementMovie = await findBiggestDisagreementMovie(user_a, user_b);

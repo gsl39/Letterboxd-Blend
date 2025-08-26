@@ -260,7 +260,8 @@ export default function BlendResultsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_a: handles.user_a,
-            user_b: handles.user_b
+            user_b: handles.user_b,
+            blend_id: blendId
           })
         });
         
@@ -325,7 +326,8 @@ export default function BlendResultsPage() {
         body: JSON.stringify({
           user_a: handles.user_a,
           user_b: handles.user_b,
-          max_movies: 4
+          max_movies: 4,
+          blend_id: blendId
         })
       })
       .then(response => response.json())
@@ -350,7 +352,8 @@ export default function BlendResultsPage() {
         },
         body: JSON.stringify({
           user_a: handles.user_a,
-          user_b: handles.user_b
+          user_b: handles.user_b,
+          blend_id: blendId
         })
       })
       .then(response => response.json())

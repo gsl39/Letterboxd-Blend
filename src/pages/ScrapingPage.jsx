@@ -185,45 +185,25 @@ export default function ScrapingPage() {
         setScrapingStatus(`Verifying both users complete... (attempt ${attempts}/${maxAttempts})`);
         
         try {
-          // STRICT CHECK 5: Use backend endpoint to verify user status
-          setScrapingStatus('Checking user A status via backend...');
-          const userAResponse = await fetch(`${BACKEND_URL}/api/user-scraping-status`, {
+          // STRICT CHECK 5: Use new blend scraping status endpoint
+          setScrapingStatus('Checking blend scraping status via backend...');
+          const blendResponse = await fetch(`${BACKEND_URL}/api/blend-scraping-status`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ handle: handles.user_a })
+            body: JSON.stringify({ blend_id: blendId })
           });
           
-          if (!userAResponse.ok) {
-            throw new Error('Failed to check User A status');
+          if (!blendResponse.ok) {
+            throw new Error('Failed to check blend scraping status');
           }
           
-          const userAStatus = await userAResponse.json();
-          console.log('User A status:', userAStatus);
+          const blendStatus = await blendResponse.json();
+          console.log('Blend scraping status:', blendStatus);
           
-          if (!userAStatus.hasMovies) {
-            setScrapingStatus('User A has no movies. Please start over.');
-            setTimeout(() => navigate(`/blend/${blendId}`), 5000);
-            return;
-          }
-          
-          setScrapingStatus('Checking user B status via backend...');
-          const userBResponse = await fetch(`${BACKEND_URL}/api/user-scraping-status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ handle: handles.user_b })
-          });
-          
-          if (!userBResponse.ok) {
-            throw new Error('Failed to check User B status');
-          }
-          
-          const userBStatus = await userBResponse.json();
-          console.log('User B status:', userBStatus);
-          
-          if (!userBStatus.hasMovies) {
-            setScrapingStatus('User B has no movies. Please try again.');
+          if (!blendStatus.all_complete) {
+            setScrapingStatus(`Scraping not complete: User A: ${blendStatus.user_a_complete ? '✅' : '❌'}, User B: ${blendStatus.user_b_complete ? '✅' : '❌'}`);
             if (attempts >= maxAttempts) {
-              setScrapingStatus('User B verification timeout. Please try again.');
+              setScrapingStatus('Scraping verification timeout. Please try again.');
               setTimeout(() => navigate(`/blend/${blendId}`), 5000);
             } else {
               setTimeout(verify, 3000);
@@ -231,7 +211,7 @@ export default function ScrapingPage() {
             return;
           }
           
-          console.log(`📊 User A: ${userAStatus.movieCount} movies (${userAStatus.status}), User B: ${userBStatus.movieCount} movies (${userBStatus.status})`);
+          console.log(`✅ Both users scraped: User A: ${blendStatus.user_a_complete}, User B: ${blendStatus.user_b_complete}`);
           
           // STRICT CHECK 6: Verify metadata is ready via backend
           setScrapingStatus('Checking metadata readiness via backend...');
