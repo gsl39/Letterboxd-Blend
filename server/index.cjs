@@ -251,7 +251,7 @@ app.post('/api/scrape', async (req, res) => {
     // --- End enrichment ---
     
     // Now that both user movies AND metadata are complete, mark scraping complete
-    ongoingScrapes.delete(scrapingKey);
+    ongoingScrapes.delete(`${blend_id}:${user}`);
     markScrapingComplete(blend_id, user);
     console.log(`✅ Scraping AND metadata complete for ${handle} (${user}) in blend ${blend_id}`);
     

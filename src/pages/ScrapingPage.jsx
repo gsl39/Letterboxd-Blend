@@ -293,22 +293,10 @@ export default function ScrapingPage() {
         {/* Loading text overlay */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-2xl font-manrope text-gray-600 animate-pulse">
-            {scrapingStatus}
+            Scraping movies from Letterboxd...
           </div>
         </div>
       </div>
-      
-      {/* Retry button for errors */}
-      {(scrapingStatus.includes('failed') || scrapingStatus.includes('timeout') || scrapingStatus.includes('Please refresh')) ? (
-        <div className="mt-8">
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-manrope"
-          >
-            Retry Scraping
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
