@@ -52,25 +52,8 @@ export default function ScrapingPage() {
         
         console.log(`✅ User A has ${userAMovies.length} movies`);
         
-        // STRICT CHECK 2: Check if user B already has movies
-        setScrapingStatus('Checking User B movies...');
-        const { data: userBMovies, error: userBError } = await supabase
-          .from('user_films_with_films')
-          .select('film_slug')
-          .eq('user_handle', data.user_b);
-        
-        if (userBError) {
-          console.error('Error checking User B movies:', userBError);
-          setScrapingStatus('Error checking User B. Please try again.');
-          return;
-        }
-        
-        if (userBMovies && userBMovies.length > 0) {
-          console.log(`✅ User B already has ${userBMovies.length} movies`);
-          setScrapingStatus('Both users ready! Verifying metadata...');
-          await verifyBothUsersComplete();
-          return;
-        }
+        // STRICT CHECK 2: Always scrape User B when they join (don't skip if they have old movies)
+        setScrapingStatus('Preparing to scrape User B movies...');
         
         // STRICT CHECK 3: User B needs scraping - start the process
         console.log('Starting scraping for user_b:', data.user_b);
