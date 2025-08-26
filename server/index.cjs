@@ -60,10 +60,16 @@ app.post('/api/scrape', async (req, res) => {
 
   // Mark this user as being scraped
   ongoingScrapes.add(handle);
+  
+  // Initialize scraping lock for this blend if it doesn't exist
+  if (!scrapingLocks.has(blend_id)) {
+    scrapingLocks.set(blend_id, { user_a_complete: false, user_b_complete: false });
+    console.log(`🔒 Initialized scraping lock for new blend ${blend_id}`);
+  }
 
   try {
     const movies = await getAllWatchedMovies(handle);
-    console.log(movies);
+    console.log(`🎬 Scraped ${movies.length} movies for ${handle} in blend ${blend_id}`);
 
     // Prepare rows for bulk insert
     const rows = movies.map(movie => ({
@@ -81,6 +87,7 @@ app.post('/api/scrape', async (req, res) => {
       throw error;
     }
 
+    console.log(`💾 Inserted ${rows.length} movies for ${handle} in blend ${blend_id}`);
     res.json({ success: true, count: rows.length });
     
     // Remove from ongoing scrapes
