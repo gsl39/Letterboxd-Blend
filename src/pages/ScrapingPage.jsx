@@ -107,16 +107,13 @@ export default function ScrapingPage() {
           setScrapingStatus(`Scraping failed: ${error.message}`);
           setScrapingProgress(0);
           
-          // Show error for a few seconds, then redirect back
-          setTimeout(() => {
-            navigate(`/blend/${blendId}`);
-          }, 5000);
+          // Stay on ScrapingPage and show retry option
+          setScrapingStatus(`Scraping failed: ${error.message}. Please refresh the page to try again.`);
         }
         
       } catch (error) {
         console.error('Error:', error);
-        setScrapingStatus(`Error: ${error.message}`);
-        setTimeout(() => navigate(`/blend/${blendId}`), 3000);
+        setScrapingStatus(`Error: ${error.message}. Please refresh the page to try again.`);
       }
     }
     
@@ -146,8 +143,7 @@ export default function ScrapingPage() {
             await verifyBothUsersComplete();
           } else {
             if (attempts >= maxAttempts) {
-              setScrapingStatus('Scraping verification failed after multiple attempts');
-              setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+              setScrapingStatus('Scraping verification failed after multiple attempts. Please refresh the page to try again.');
             } else {
               setScrapingStatus(`Waiting for data to appear... (attempt ${attempts}/${maxAttempts})`);
               setTimeout(verify, 2000);
@@ -156,8 +152,7 @@ export default function ScrapingPage() {
         } catch (error) {
           console.error('Verification error:', error);
           if (attempts >= maxAttempts) {
-            setScrapingStatus('Verification failed. Please try again.');
-            setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+            setScrapingStatus('Verification failed. Please refresh the page to try again.');
           } else {
             setTimeout(verify, 2000);
           }
@@ -194,12 +189,11 @@ export default function ScrapingPage() {
           
           if (!blendStatus.all_complete) {
             setScrapingStatus(`Scraping not complete: User A: ${blendStatus.user_a_complete ? '✅' : '❌'}, User B: ${blendStatus.user_b_complete ? '✅' : '❌'}`);
-            if (attempts >= maxAttempts) {
-              setScrapingStatus('Scraping verification timeout. Please try again.');
-              setTimeout(() => navigate(`/blend/${blendId}`), 5000);
-            } else {
-              setTimeout(verify, 3000);
-            }
+                          if (attempts >= maxAttempts) {
+                setScrapingStatus('Scraping verification timeout. Please refresh the page to try again.');
+              } else {
+                setTimeout(verify, 3000);
+              }
             return;
           }
           
@@ -229,8 +223,7 @@ export default function ScrapingPage() {
             } else {
               setScrapingStatus(`Metadata not ready: ${metadataStatus.metadata_status.total_missing} missing`);
               if (attempts >= maxAttempts) {
-                setScrapingStatus('Metadata verification timeout. Please try again.');
-                setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+                setScrapingStatus('Metadata verification timeout. Please refresh the page to try again.');
               } else {
                 setTimeout(verify, 3000);
               }
@@ -241,8 +234,7 @@ export default function ScrapingPage() {
         } catch (error) {
           console.error('Verification error:', error);
           if (attempts >= maxAttempts) {
-            setScrapingStatus('Verification failed. Please try again.');
-            setTimeout(() => navigate(`/blend/${blendId}`), 5000);
+            setScrapingStatus('Verification failed. Please refresh the page to try again.');
           } else {
             setTimeout(verify, 3000);
           }
@@ -305,6 +297,18 @@ export default function ScrapingPage() {
           </div>
         </div>
       </div>
+      
+      {/* Retry button for errors */}
+      {(scrapingStatus.includes('failed') || scrapingStatus.includes('timeout') || scrapingStatus.includes('Please refresh')) ? (
+        <div className="mt-8">
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-manrope"
+          >
+            Retry Scraping
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
