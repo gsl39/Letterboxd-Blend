@@ -88,15 +88,7 @@ app.post('/api/scrape', async (req, res) => {
     }
 
     console.log(`💾 Inserted ${rows.length} movies for ${handle} in blend ${blend_id}`);
-    res.json({ success: true, count: rows.length });
     
-    // Remove from ongoing scrapes
-    ongoingScrapes.delete(handle);
-    
-    // Mark scraping complete for this user in this blend
-    markScrapingComplete(blend_id, user);
-    console.log(`✅ Scraping complete for ${handle} (${user}) in blend ${blend_id}`);
-
     // --- Enrich films table synchronously ---
     // Get unique film_slugs from this batch
     const uniqueSlugs = Array.from(
@@ -257,6 +249,14 @@ app.post('/api/scrape', async (req, res) => {
       console.log(`ℹ️ No new films to scrape metadata for.`);
     }
     // --- End enrichment ---
+    
+    // Now that both user movies AND metadata are complete, mark scraping complete
+    ongoingScrapes.delete(scrapingKey);
+    markScrapingComplete(blend_id, user);
+    console.log(`✅ Scraping AND metadata complete for ${handle} (${user}) in blend ${blend_id}`);
+    
+    // Send response after everything is complete
+    res.json({ success: true, count: rows.length });
 
   } catch (err) {
     console.error('Error in scraping:', err);

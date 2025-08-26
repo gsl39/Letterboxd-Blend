@@ -24,8 +24,13 @@ export default function ScrapingPage() {
           .single();
         
         if (!data || !data.user_b) {
-          console.error('No user_b found in blend');
-          navigate(`/blend/${blendId}`);
+          console.error('No user_b found in blend, waiting for database update...');
+          setScrapingStatus('Waiting for User B to join...');
+          
+          // Wait a bit for database to update, then retry
+          setTimeout(() => {
+            fetchHandlesAndStartScraping();
+          }, 2000);
           return;
         }
         
@@ -45,8 +50,12 @@ export default function ScrapingPage() {
         }
         
         if (!userAMovies || userAMovies.length === 0) {
-          setScrapingStatus('User A has no movies. Please start over.');
-          setTimeout(() => navigate(`/blend/${blendId}`), 3000);
+          setScrapingStatus('User A has no movies, waiting for scraping to complete...');
+          
+          // Wait a bit for User A's scraping to complete, then retry
+          setTimeout(() => {
+            fetchHandlesAndStartScraping();
+          }, 3000);
           return;
         }
         

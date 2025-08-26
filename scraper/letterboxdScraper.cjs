@@ -138,8 +138,15 @@ async function getFilmMetadataFromLetterboxd(slug) {
           '--no-sandbox', 
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage', // Moderate optimization
-          '--no-first-run' // Moderate optimization
-        ]
+          '--no-first-run', // Moderate optimization
+          '--disable-gpu', // Render.com compatibility
+          '--disable-software-rasterizer', // Render.com compatibility
+          '--disable-extensions', // Render.com compatibility
+          '--single-process', // Render.com compatibility
+          '--no-zygote' // Render.com compatibility
+        ],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // Use system Chrome if available
+        ignoreDefaultArgs: ['--disable-extensions'] // Allow extensions for better compatibility
       });
       
       const page = await browser.newPage();
@@ -182,7 +189,51 @@ async function getFilmMetadataFromLetterboxd(slug) {
     } catch (puppeteerError) {
       console.error(`❌ Error getting popularity for ${slug}:`, puppeteerError.message);
       console.error(`❌ Full puppeteer error for ${slug}:`, puppeteerError);
-      // Continue without popularity data
+      
+      // Try alternative method: use system Chrome if available
+      try {
+        console.log(`🔄 Trying alternative Chrome path for ${slug}...`);
+        const browser = await puppeteer.launch({ 
+          headless: true,
+          args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process'
+          ],
+          executablePath: '/usr/bin/google-chrome' // Common system Chrome path
+        });
+        
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        console.log(`🌐 Alternative: Loading page for ${slug}...`);
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        
+        await page.waitForSelector('.production-statistic.-watches', { timeout: 8000 });
+        
+        const popularityData = await page.evaluate(() => {
+          const watchesElement = document.querySelector('.production-statistic.-watches');
+          if (watchesElement) {
+            return watchesElement.getAttribute('aria-label');
+          }
+          return null;
+        });
+        
+        if (popularityData) {
+          const popularityMatch = popularityData.match(/Watched by ([\d,]+)/);
+          if (popularityMatch) {
+            popularity = parseInt(popularityMatch[1].replace(/,/g, ''), 10);
+            console.log(`✅ Alternative method success for ${slug}: ${popularity}`);
+          }
+        }
+        
+        await browser.close();
+      } catch (fallbackError) {
+        console.log(`❌ Alternative method also failed for ${slug}:`, fallbackError.message);
+        // Continue without popularity data
+      }
     }
 
     const result = {
@@ -191,7 +242,7 @@ async function getFilmMetadataFromLetterboxd(slug) {
       poster_url: poster_url || '',
       genres: genres.length ? genres : null,
       directors: directors.length ? directors : null,
-      popularity
+      popularity: popularity || 0 // Default to 0 if popularity scraping fails
     };
     
     console.log(`🎯 Final metadata result for ${slug}:`, result);
