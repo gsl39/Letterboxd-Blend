@@ -539,10 +539,12 @@ function calculateCompatibilityScore(userAFilms, userBFilms) {
 // Function to get user films data from Supabase
 async function getUserFilmsData(userHandle) {
   try {
+    // Remove pagination limit to get ALL films for the user
     const { data, error } = await supabase
       .from('user_films_with_films')
       .select('*')
-      .eq('user_handle', userHandle);
+      .eq('user_handle', userHandle)
+      .limit(10000); // Increase limit to handle users with many movies
     
     if (error) {
       console.error(`Error fetching data for user ${userHandle}:`, error);
@@ -563,18 +565,20 @@ async function getCommonFilmsStats(userA, userB) {
   try {
     console.log('Debug [NEW]: Starting to fetch user films...');
     
-    // Get all films for both users
+    // Get all films for both users (remove pagination limit)
     console.log('🔍 Fetching films for userA:', userA);
     const { data: userAFilms, error: errorA } = await supabase
       .from('user_films_with_films')
       .select('*')
-      .eq('user_handle', userA);
+      .eq('user_handle', userA)
+      .limit(10000); // Increase limit to handle users with many movies
     
     console.log('🔍 Fetching films for userB:', userB);
     const { data: userBFilms, error: errorB } = await supabase
       .from('user_films_with_films')
       .select('*')
-      .eq('user_handle', userB);
+      .eq('user_handle', userB)
+      .limit(10000); // Increase limit to handle users with many movies
     
     console.log('📊 Fetched films - userA:', userAFilms?.length, 'userB:', userBFilms?.length);
     
