@@ -544,7 +544,7 @@ async function getUserFilmsData(userHandle) {
       .from('user_films_with_films')
       .select('*')
       .eq('user_handle', userHandle)
-      .limit(10000); // Increase limit to handle users with many movies
+      .limit(5000); // Conservative limit to handle users with many movies
     
     if (error) {
       console.error(`Error fetching data for user ${userHandle}:`, error);
@@ -571,14 +571,14 @@ async function getCommonFilmsStats(userA, userB) {
       .from('user_films_with_films')
       .select('*')
       .eq('user_handle', userA)
-      .limit(10000); // Increase limit to handle users with many movies
+      .limit(5000); // Conservative limit to handle users with many movies
     
     console.log('🔍 Fetching films for userB:', userB);
     const { data: userBFilms, error: errorB } = await supabase
       .from('user_films_with_films')
       .select('*')
       .eq('user_handle', userB)
-      .limit(10000); // Increase limit to handle users with many movies
+      .limit(5000); // Conservative limit to handle users with many movies
     
     console.log('📊 Fetched films - userA:', userAFilms?.length, 'userB:', userBFilms?.length);
     
