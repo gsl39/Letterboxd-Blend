@@ -6,7 +6,20 @@ const { getCompatibilityScore, checkMetadataReadiness } = require('./compatibili
 const { findCommonMovies, getCommonMoviesSummary, findBiggestDisagreementMovie } = require('./commonMovies.cjs');
 
 const app = express();
-app.use(cors());
+
+// Configure CORS to allow requests from Vercel
+app.use(cors({
+  origin: [
+    'https://letterboxd-blend-9uuu4sh7s-guilherme-limas-projects-7236477c.vercel.app',
+    'https://letterboxd-blend.vercel.app',
+    'http://localhost:5173', // For local development
+    'http://localhost:3000'  // For local development
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 // Track ongoing scraping operations to prevent duplicates
