@@ -536,22 +536,37 @@ function calculateCompatibilityScore(userAFilms, userBFilms) {
   };
 }
 
-// Function to get user films data from Supabase
+// Function to get user films data from Supabase using batch processing
 async function getUserFilmsData(userHandle) {
   try {
-    // Remove pagination limit to get ALL films for the user
-    const { data, error } = await supabase
-      .from('user_films_with_films')
-      .select('*')
-      .eq('user_handle', userHandle)
-      .limit(5000); // Conservative limit to handle users with many movies
+    let allMovies = [];
+    let offset = 0;
+    const batchSize = 1000;
     
-    if (error) {
-      console.error(`Error fetching data for user ${userHandle}:`, error);
-      return [];
-    }
+    console.log(`🔍 Fetching movies for ${userHandle} in batches of ${batchSize}...`);
     
-    return data || [];
+    do {
+      const { data, error } = await supabase
+        .from('user_films_with_films')
+        .select('*')
+        .eq('user_handle', userHandle)
+        .range(offset, offset + batchSize - 1);
+      
+      if (error) {
+        console.error(`Error fetching batch for ${userHandle} at offset ${offset}:`, error);
+        break;
+      }
+      
+      if (data && data.length > 0) {
+        allMovies = allMovies.concat(data);
+        console.log(`📦 Fetched batch: ${data.length} movies (total so far: ${allMovies.length})`);
+      }
+      
+      offset += batchSize;
+    } while (data && data.length === batchSize);
+    
+    console.log(`✅ Total movies fetched for ${userHandle}: ${allMovies.length}`);
+    return allMovies;
   } catch (err) {
     console.error(`Error fetching data for user ${userHandle}:`, err);
     return [];
@@ -565,20 +580,12 @@ async function getCommonFilmsStats(userA, userB) {
   try {
     console.log('Debug [NEW]: Starting to fetch user films...');
     
-    // Get all films for both users (remove pagination limit)
+    // Get all films for both users using batch processing
     console.log('🔍 Fetching films for userA:', userA);
-    const { data: userAFilms, error: errorA } = await supabase
-      .from('user_films_with_films')
-      .select('*')
-      .eq('user_handle', userA)
-      .limit(5000); // Conservative limit to handle users with many movies
+    const userAFilms = await getUserFilmsData(userA);
     
     console.log('🔍 Fetching films for userB:', userB);
-    const { data: userBFilms, error: errorB } = await supabase
-      .from('user_films_with_films')
-      .select('*')
-      .eq('user_handle', userB)
-      .limit(5000); // Conservative limit to handle users with many movies
+    const userBFilms = await getUserFilmsData(userB);
     
     console.log('📊 Fetched films - userA:', userAFilms?.length, 'userB:', userBFilms?.length);
     
@@ -603,8 +610,8 @@ async function getCommonFilmsStats(userA, userB) {
       });
     }
     
-    if (errorA || errorB) {
-      console.error('Error fetching user films:', errorA || errorB);
+    if (!userAFilms || !userBFilms || userAFilms.length === 0 || userBFilms.length === 0) {
+      console.error('Error: One or both users have no films');
       return { favorite_genres: [], favorite_directors: [] };
     }
     
