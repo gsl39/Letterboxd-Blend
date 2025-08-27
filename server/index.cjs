@@ -52,14 +52,15 @@ app.post('/api/scrape', async (req, res) => {
   }
   console.log('✅ Handle received:', handle, 'for blend:', blend_id, 'user:', user);
 
-  // Prevent duplicate scraping for the same user
-  if (ongoingScrapes.has(handle)) {
-    console.log(`Scraping already in progress for ${handle}, returning existing operation`);
+  // Prevent duplicate scraping for the same user in the same blend
+  const scrapingKey = `${blend_id}:${user}`;
+  if (ongoingScrapes.has(scrapingKey)) {
+    console.log(`Scraping already in progress for ${handle} (${user}) in blend ${blend_id}, returning existing operation`);
     return res.json({ success: true, count: 0, message: 'Scraping already in progress' });
   }
 
-  // Mark this user as being scraped
-  ongoingScrapes.add(handle);
+  // Mark this user as being scraped in this blend
+  ongoingScrapes.add(scrapingKey);
   
   // Initialize scraping lock for this blend if it doesn't exist
   if (!scrapingLocks.has(blend_id)) {
@@ -261,7 +262,7 @@ app.post('/api/scrape', async (req, res) => {
   } catch (err) {
     console.error('Error in scraping:', err);
     // Remove from ongoing scrapes on error
-    ongoingScrapes.delete(handle);
+    ongoingScrapes.delete(scrapingKey);
     res.status(500).json({ error: err.message });
   }
 });
