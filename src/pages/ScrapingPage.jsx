@@ -189,16 +189,16 @@ export default function ScrapingPage() {
           
           if (!blendStatus.all_complete) {
             setScrapingStatus(`Scraping not complete: User A: ${blendStatus.user_a_complete ? '✅' : '❌'}, User B: ${blendStatus.user_b_complete ? '✅' : '❌'}`);
-                          if (attempts >= maxAttempts) {
-                setScrapingStatus('Scraping verification timeout. Please refresh the page to try again.');
-              } else {
-                setTimeout(verify, 3000);
-              }
+            if (attempts >= maxAttempts) {
+              setScrapingStatus('Scraping verification timeout. Please refresh the page to try again.');
+            } else {
+              setTimeout(verify, 3000);
+            }
             return;
           }
           
           console.log(`✅ Both users scraped: User A: ${blendStatus.user_a_complete}, User B: ${blendStatus.user_b_complete}`);
-          
+        
           // STRICT CHECK 6: Verify metadata is ready via backend
           setScrapingStatus('Checking metadata readiness via backend...');
           const metadataResponse = await fetch(`${BACKEND_URL}/api/metadata-ready`, {
@@ -227,6 +227,7 @@ export default function ScrapingPage() {
               } else {
                 setTimeout(verify, 3000);
               }
+              return;
             }
           } else {
             throw new Error('Failed to check metadata readiness');
