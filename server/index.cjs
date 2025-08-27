@@ -25,15 +25,22 @@ function isScrapingComplete(blendId) {
 }
 
 // Helper function to mark scraping complete for a user in a blend
-function markScrapingComplete(blendId, user) {
+function markScrapingComplete(blendId, user, scrapedCount) {
   if (!scrapingLocks.has(blendId)) {
-    scrapingLocks.set(blendId, { user_a_complete: false, user_b_complete: false });
+    scrapingLocks.set(blendId, { 
+      user_a_complete: false, 
+      user_b_complete: false,
+      user_a_count: 0,
+      user_b_count: 0
+    });
   }
   const lock = scrapingLocks.get(blendId);
   if (user === 'a') {
     lock.user_a_complete = true;
+    lock.user_a_count = scrapedCount;
   } else if (user === 'b') {
     lock.user_b_complete = true;
+    lock.user_b_count = scrapedCount;
   }
   console.log(`🔒 Scraping lock updated for blend ${blendId}:`, lock);
 }
@@ -64,7 +71,12 @@ app.post('/api/scrape', async (req, res) => {
   
   // Initialize scraping lock for this blend if it doesn't exist
   if (!scrapingLocks.has(blend_id)) {
-    scrapingLocks.set(blend_id, { user_a_complete: false, user_b_complete: false });
+    scrapingLocks.set(blend_id, { 
+      user_a_complete: false, 
+      user_b_complete: false,
+      user_a_count: 0,
+      user_b_count: 0
+    });
     console.log(`🔒 Initialized scraping lock for new blend ${blend_id}`);
   }
 
@@ -253,7 +265,7 @@ app.post('/api/scrape', async (req, res) => {
     
     // Now that both user movies AND metadata are complete, mark scraping complete
     ongoingScrapes.delete(`${blend_id}:${user}`);
-    markScrapingComplete(blend_id, user);
+    markScrapingComplete(blend_id, user, rows.length);
     console.log(`✅ Scraping AND metadata complete for ${handle} (${user}) in blend ${blend_id}`);
     
     // Send response after everything is complete
@@ -319,6 +331,8 @@ app.post('/api/blend-scraping-status', async (req, res) => {
       blend_id,
       user_a_complete: lock.user_a_complete,
       user_b_complete: lock.user_b_complete,
+      user_a_count: lock.user_a_count || 0,
+      user_b_count: lock.user_b_count || 0,
       all_complete: allComplete,
       status: allComplete ? 'complete' : 'in_progress'
     });
@@ -604,15 +618,22 @@ app.get('/api/status', (req, res) => {
 // Metadata readiness endpoint
 app.post('/api/metadata-ready', async (req, res) => {
   try {
-    const { user_a, user_b } = req.body;
+    const { user_a, user_b, blend_id } = req.body;
     
     if (!user_a || !user_b) {
       return res.status(400).json({ error: 'Both user_a and user_b are required' });
     }
     
-    console.log(`Checking metadata readiness for ${user_a} vs ${user_b}`);
+    console.log(`Checking metadata readiness for ${user_a} vs ${user_b} in blend ${blend_id}`);
     
-    const readiness = await checkMetadataReadiness(user_a, user_b);
+    // Get scraping lock data for count verification
+    const lock = scrapingLocks.get(blend_id);
+    const lockData = lock ? {
+      user_a_count: lock.user_a_count,
+      user_b_count: lock.user_b_count
+    } : null;
+    
+    const readiness = await checkMetadataReadiness(user_a, user_b, lockData);
     
     res.json(readiness);
   } catch (error) {

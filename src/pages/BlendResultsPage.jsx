@@ -200,7 +200,8 @@ export default function BlendResultsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_a: handles.user_a,
-            user_b: handles.user_b
+            user_b: handles.user_b,
+            blend_id: blendId
           })
         });
         

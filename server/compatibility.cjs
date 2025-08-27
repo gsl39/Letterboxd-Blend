@@ -799,7 +799,7 @@ async function getCompatibilityScore(userA, userB) {
 }
 
 // Function to check metadata readiness for compatibility calculation
-async function checkMetadataReadiness(userA, userB) {
+async function checkMetadataReadiness(userA, userB, lockData) {
   try {
     const userAFilms = await getUserFilmsData(userA);
     const userBFilms = await getUserFilmsData(userB);
@@ -811,6 +811,47 @@ async function checkMetadataReadiness(userA, userB) {
         user_a: userA,
         user_b: userB
       };
+    }
+    
+    // Get expected counts from scraping locks (if available)
+    let expectedUserACount = null;
+    let expectedUserBCount = null;
+    
+    if (lockData) {
+      expectedUserACount = lockData.user_a_count;
+      expectedUserBCount = lockData.user_b_count;
+      
+      console.log(`🔍 Expected counts - User A: ${expectedUserACount}, User B: ${expectedUserBCount}`);
+      console.log(`🔍 Actual counts - User A: ${userAFilms.length}, User B: ${userBFilms.length}`);
+      
+      // Verify scraping completeness
+      if (expectedUserACount && userAFilms.length !== expectedUserACount) {
+        return {
+          ready: false,
+          error: `User A scraping incomplete: expected ${expectedUserACount}, got ${userAFilms.length}`,
+          user_a: userA,
+          user_b: userB,
+          scraping_verification: {
+            user_a_expected: expectedUserACount,
+            user_a_actual: userAFilms.length,
+            user_a_complete: false
+          }
+        };
+      }
+      
+      if (expectedUserBCount && userBFilms.length !== expectedUserBCount) {
+        return {
+          ready: false,
+          error: `User B scraping incomplete: expected ${expectedUserBCount}, got ${userBFilms.length}`,
+          user_a: userA,
+          user_b: userB,
+          scraping_verification: {
+            user_b_expected: expectedUserBCount,
+            user_b_actual: userBFilms.length,
+            user_b_complete: false
+          }
+        };
+      }
     }
     
     const userAMissingMetadata = userAFilms.filter(film => 
@@ -837,6 +878,14 @@ async function checkMetadataReadiness(userA, userB) {
           user_a: userAMissingMetadata.map(f => f.film_slug).slice(0, 10),
           user_b: userBMissingMetadata.map(f => f.film_slug).slice(0, 10)
         }
+      },
+      scraping_verification: {
+        user_a_expected: expectedUserACount,
+        user_a_actual: userAFilms.length,
+        user_a_complete: expectedUserACount ? userAFilms.length === expectedUserACount : null,
+        user_b_expected: expectedUserBCount,
+        user_b_actual: userBFilms.length,
+        user_b_complete: expectedUserBCount ? userBFilms.length === expectedUserBCount : null
       }
     };
   } catch (err) {
