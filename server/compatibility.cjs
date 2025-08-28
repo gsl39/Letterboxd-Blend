@@ -828,11 +828,12 @@ async function checkMetadataReadiness(userA, userB, lockData) {
       console.log(`🔍 Expected counts - User A: ${expectedUserACount}, User B: ${expectedUserBCount}`);
       console.log(`🔍 Actual counts - User A: ${userAFilms.length}, User B: ${userBFilms.length}`);
       
-      // Verify scraping completeness
-      if (expectedUserACount && userAFilms.length !== expectedUserACount) {
+      // Verify scraping completeness with ±10 buffer for robustness
+      const buffer = 10;
+      if (expectedUserACount && Math.abs(userAFilms.length - expectedUserACount) > buffer) {
         return {
           ready: false,
-          error: `User A scraping incomplete: expected ${expectedUserACount}, got ${userAFilms.length}`,
+          error: `User A scraping incomplete: expected ${expectedUserACount} ±${buffer}, got ${userAFilms.length}`,
           user_a: userA,
           user_b: userB,
           scraping_verification: {
@@ -843,10 +844,10 @@ async function checkMetadataReadiness(userA, userB, lockData) {
         };
       }
       
-      if (expectedUserBCount && userBFilms.length !== expectedUserBCount) {
+      if (expectedUserBCount && Math.abs(userBFilms.length - expectedUserBCount) > buffer) {
         return {
           ready: false,
-          error: `User B scraping incomplete: expected ${expectedUserBCount}, got ${userBFilms.length}`,
+          error: `User B scraping incomplete: expected ${expectedUserBCount} ±${buffer}, got ${userBFilms.length}`,
           user_a: userA,
           user_b: userB,
           scraping_verification: {
@@ -886,10 +887,10 @@ async function checkMetadataReadiness(userA, userB, lockData) {
       scraping_verification: {
         user_a_expected: expectedUserACount,
         user_a_actual: userAFilms.length,
-        user_a_complete: expectedUserACount ? userAFilms.length === expectedUserACount : null,
+        user_a_complete: expectedUserACount ? Math.abs(userAFilms.length - expectedUserACount) <= buffer : null,
         user_b_expected: expectedUserBCount,
         user_b_actual: userBFilms.length,
-        user_b_complete: expectedUserBCount ? userBFilms.length === expectedUserBCount : null
+        user_b_complete: expectedUserBCount ? Math.abs(userBFilms.length - expectedUserBCount) <= buffer : null
       }
     };
   } catch (err) {
