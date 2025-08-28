@@ -11,6 +11,7 @@ const app = express();
 app.use(cors({
   origin: [
     'https://letterboxd-blend-9uuu4sh7s-guilherme-limas-projects-7236477c.vercel.app',
+    'https://letterboxd-blend-5tppkwxte-guilherme-limas-projects-7236477c.vercel.app', // New domain
     'https://letterboxd-blend.vercel.app',
     'http://localhost:5173', // For local development
     'http://localhost:3000'  // For local development
