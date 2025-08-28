@@ -140,7 +140,7 @@ export default function ScrapingPage() {
           if (userBMovies && userBMovies.length > 0) {
             console.log(`✅ User B now has ${userBMovies.length} movies`);
             setScrapingStatus('Scraping verified! Checking metadata...');
-            await verifyBothUsersComplete();
+            await verifyMetadataReady();
           } else {
             if (attempts >= maxAttempts) {
               setScrapingStatus('Scraping verification failed after multiple attempts. Please refresh the page to try again.');
@@ -162,44 +162,17 @@ export default function ScrapingPage() {
       await verify();
     }
     
-    // STRICT VERIFICATION: Verify both users are completely ready
-    async function verifyBothUsersComplete() {
+    // VERIFICATION: Check metadata readiness (scraping is already verified by this point)
+    async function verifyMetadataReady() {
       let attempts = 0;
       const maxAttempts = 15;
       
       const verify = async () => {
         attempts++;
-        setScrapingStatus(`Verifying both users complete... (attempt ${attempts}/${maxAttempts})`);
+        setScrapingStatus(`Checking metadata readiness... (attempt ${attempts}/${maxAttempts})`);
         
         try {
-          // STRICT CHECK 5: Use new blend scraping status endpoint
-          setScrapingStatus('Checking blend scraping status via backend...');
-          const blendResponse = await fetch(`${BACKEND_URL}/api/blend-scraping-status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blend_id: blendId })
-          });
-          
-          if (!blendResponse.ok) {
-            throw new Error('Failed to check blend scraping status');
-          }
-          
-          const blendStatus = await blendResponse.json();
-          console.log('Blend scraping status:', blendStatus);
-          
-          if (!blendStatus.all_complete) {
-            setScrapingStatus(`Scraping not complete: User A: ${blendStatus.user_a_complete ? '✅' : '❌'}, User B: ${blendStatus.user_b_complete ? '✅' : '❌'}`);
-            if (attempts >= maxAttempts) {
-              setScrapingStatus('Scraping verification timeout. Please refresh the page to try again.');
-            } else {
-              setTimeout(verify, 3000);
-            }
-            return;
-          }
-          
-          console.log(`✅ Both users scraped: User A: ${blendStatus.user_a_complete}, User B: ${blendStatus.user_b_complete}`);
-        
-          // STRICT CHECK 6: Verify metadata is ready via backend
+          // Check metadata readiness via backend
           setScrapingStatus('Checking metadata readiness via backend...');
           const metadataResponse = await fetch(`${BACKEND_URL}/api/metadata-ready`, {
             method: 'POST',
@@ -236,7 +209,7 @@ export default function ScrapingPage() {
         } catch (error) {
           console.error('Verification error:', error);
           if (attempts >= maxAttempts) {
-            setScrapingStatus('Verification failed. Please refresh the page to try again.');
+            setScrapingStatus('Metadata verification timeout. Please refresh the page to try again.');
           } else {
             setTimeout(verify, 3000);
           }
