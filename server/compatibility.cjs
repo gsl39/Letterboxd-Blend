@@ -824,6 +824,10 @@ async function checkMetadataReadiness(userA, userB, lockData) {
     // Define buffer outside the if block so it's accessible everywhere
     const buffer = 10;
     
+    // Define completion tracking variables outside the if block so they're accessible everywhere
+    let userAComplete = false;
+    let userBComplete = false;
+    
     if (lockData) {
       expectedUserACount = lockData.user_a_count;
       expectedUserBCount = lockData.user_b_count;
@@ -832,8 +836,6 @@ async function checkMetadataReadiness(userA, userB, lockData) {
       console.log(`🔍 Actual counts - User A: ${userAFilms.length}, User B: ${userBFilms.length}`);
       
       // Verify scraping completeness with ±10 buffer for robustness
-      let userAComplete = false;
-      let userBComplete = false;
       
       if (expectedUserACount && Math.abs(userAFilms.length - expectedUserACount) > buffer) {
         return {
