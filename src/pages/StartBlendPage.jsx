@@ -23,11 +23,23 @@ export default function StartBlendPage() {
     setBlendId(blend_id);
 
     // Call your Express API to scrape movies for User A
-          await fetch(`${BACKEND_URL}/api/scrape`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ handle: cleanHandle, blend_id, user: 'a' }),
-    });
+    try {
+      console.log(`🚀 Starting scraping for User A: ${cleanHandle}`);
+      const response = await fetch(`${BACKEND_URL}/api/scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: cleanHandle, blend_id, user: 'a' }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Scraping failed: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log(`✅ User A scraping result:`, result);
+    } catch (error) {
+      console.error(`❌ User A scraping failed:`, error);
+    }
   };
 
     useEffect(() => {
