@@ -7,8 +7,34 @@ const { findCommonMovies, getCommonMoviesSummary, findBiggestDisagreementMovie }
 
 const app = express();
 
-// CORS configuration - allow all origins (like it was working before)
-app.use(cors());
+// CORS configuration - dynamic origin detection for Vercel preview domains
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    // Allow local development
+    if (origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
+    
+    // Allow ANY Vercel preview domain from your project
+    if (origin.includes('guilherme-limas-projects-7236477c.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Allow your main Vercel domain
+    if (origin === 'https://letterboxd-blend.vercel.app') {
+      return callback(null, true);
+    }
+    
+    // Block everything else
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.use(express.json());
 
