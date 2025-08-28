@@ -8,11 +8,9 @@ export default function ScrapingPage() {
   const { blendId } = useParams();
   const navigate = useNavigate();
   const [handles, setHandles] = useState({ user_a: null, user_b: null });
-  const [isScraping, setIsScraping] = useState(false);
-  const [scrapingProgress, setScrapingProgress] = useState(0);
   const [scrapingStatus, setScrapingStatus] = useState('Preparing to scrape...');
 
-  // Fetch handles and start scraping with strict verification
+  // Fetch handles and start scraping with simple event-driven logic
   useEffect(() => {
     async function fetchHandlesAndStartScraping() {
       try {
@@ -36,49 +34,8 @@ export default function ScrapingPage() {
         
         setHandles({ user_a: data.user_a, user_b: data.user_b });
         
-        // STRICT CHECK 1: Verify user A has movies (should already be scraped)
-        setScrapingStatus('Verifying User A movies...');
-        const { data: userAMovies, error: userAError } = await supabase
-          .from('user_films_with_films')
-          .select('film_slug')
-          .eq('user_handle', data.user_a);
-        
-        if (userAError) {
-          console.error('Error checking User A movies:', userAError);
-          setScrapingStatus('Error checking User A. Please try again.');
-          return;
-        }
-        
-        if (!userAMovies || userAMovies.length === 0) {
-          setScrapingStatus('User A has no movies, waiting for scraping to complete...');
-          
-          // Wait a bit for User A's scraping to complete, then retry
-          setTimeout(() => {
-            fetchHandlesAndStartScraping();
-          }, 3000);
-          return;
-        }
-        
-        console.log(`✅ User A has ${userAMovies.length} movies`);
-        
-        // STRICT CHECK 2: Always scrape User B when they join (don't skip if they have old movies)
-        setScrapingStatus('Preparing to scrape User B movies...');
-        
-        // STRICT CHECK 3: User B needs scraping - start the process
-        console.log('Starting scraping for user_b:', data.user_b);
-        setIsScraping(true);
-        setScrapingStatus('Scraping movies from Letterboxd...');
-        
-        // Simulate progress updates
-        const progressInterval = setInterval(() => {
-          setScrapingProgress(prev => {
-            if (prev >= 90) {
-              clearInterval(progressInterval);
-              return 90;
-            }
-            return prev + Math.random() * 15;
-          });
-        }, 1000);
+        // Start scraping for User B
+        setScrapingStatus('Starting scraping for User B...');
         
         try {
           const response = await fetch(`${BACKEND_URL}/api/scrape`, {
@@ -92,22 +49,17 @@ export default function ScrapingPage() {
           });
           
           if (response.ok) {
-            console.log('Scraping completed for user_b:', data.user_b);
-            setScrapingProgress(100);
-            setScrapingStatus('Scraping complete! Verifying data...');
+            console.log('Scraping started for user_b:', data.user_b);
+            setScrapingStatus('Scraping in progress... Waiting for completion...');
             
-            // STRICT CHECK 4: Verify scraping actually worked
-            await verifyScrapingSuccess(data.user_b);
+            // Start checking final status
+            checkFinalStatus();
           } else {
             const errorText = await response.text();
             throw new Error(`Scraping failed: ${errorText}`);
           }
         } catch (error) {
           console.error('Scraping failed:', error);
-          setScrapingStatus(`Scraping failed: ${error.message}`);
-          setScrapingProgress(0);
-          
-          // Stay on ScrapingPage and show retry option
           setScrapingStatus(`Scraping failed: ${error.message}. Please refresh the page to try again.`);
         }
         
@@ -117,110 +69,45 @@ export default function ScrapingPage() {
       }
     }
     
-    // STRICT VERIFICATION: Verify scraping actually worked
-    async function verifyScrapingSuccess(userBHandle) {
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      const verify = async () => {
-        attempts++;
-        setScrapingStatus(`Verifying scraping success... (attempt ${attempts}/${maxAttempts})`);
+    // Simple function to check final status every 2 seconds
+    async function checkFinalStatus() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/blend-final-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blend_id: blendId })
+        });
         
-        try {
-          // Check if user B now has movies
-          const { data: userBMovies, error: userBError } = await supabase
-            .from('user_films_with_films')
-            .select('film_slug')
-            .eq('user_handle', userBHandle);
+        if (response.ok) {
+          const finalStatus = await response.json();
+          console.log('Final status check:', finalStatus);
           
-          if (userBError) {
-            throw userBError;
-          }
-          
-          if (userBMovies && userBMovies.length > 0) {
-            console.log(`✅ User B now has ${userBMovies.length} movies`);
-            setScrapingStatus('Scraping verified! Checking metadata...');
-            await verifyMetadataReady();
+          if (finalStatus.status === 'complete' && finalStatus.ready) {
+            setScrapingStatus('🎯 ALL SYSTEMS READY! Redirecting to results...');
+            setTimeout(() => {
+              navigate(`/blend/${blendId}/results`);
+            }, 2000);
+            return;
+          } else if (finalStatus.status === 'in_progress') {
+            setScrapingStatus(`Scraping in progress... User A: ${finalStatus.user_a_complete ? '✅' : '⏳'}, User B: ${finalStatus.user_b_complete ? '✅' : '⏳'}`);
+            // Check again in 2 seconds
+            setTimeout(checkFinalStatus, 2000);
           } else {
-            if (attempts >= maxAttempts) {
-              setScrapingStatus('Scraping verification failed after multiple attempts. Please refresh the page to try again.');
-            } else {
-              setScrapingStatus(`Waiting for data to appear... (attempt ${attempts}/${maxAttempts})`);
-              setTimeout(verify, 2000);
-            }
+            setScrapingStatus('Waiting for scraping to complete...');
+            // Check again in 2 seconds
+            setTimeout(checkFinalStatus, 2000);
           }
-        } catch (error) {
-          console.error('Verification error:', error);
-          if (attempts >= maxAttempts) {
-            setScrapingStatus('Verification failed. Please refresh the page to try again.');
-          } else {
-            setTimeout(verify, 2000);
-          }
+        } else {
+          throw new Error('Failed to check final status');
         }
-      };
-      
-      await verify();
-    }
-    
-    // VERIFICATION: Check metadata readiness (scraping is already verified by this point)
-    async function verifyMetadataReady() {
-      let attempts = 0;
-      const maxAttempts = 15;
-      
-      const verify = async () => {
-        attempts++;
-        setScrapingStatus(`Checking metadata readiness... (attempt ${attempts}/${maxAttempts})`);
-        
-        try {
-          // Check metadata readiness via backend
-          setScrapingStatus('Checking metadata readiness via backend...');
-          const metadataResponse = await fetch(`${BACKEND_URL}/api/metadata-ready`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_a: handles.user_a,
-              user_b: handles.user_b,
-              blend_id: blendId
-            })
-          });
-          
-          if (metadataResponse.ok) {
-            const metadataStatus = await metadataResponse.json();
-            console.log('Metadata status:', metadataStatus);
-            
-            if (metadataStatus.ready) {
-              setScrapingStatus('🎯 ALL SYSTEMS READY! Redirecting to results...');
-              setTimeout(() => {
-                navigate(`/blend/${blendId}/results`);
-              }, 2000);
-              return;
-            } else {
-              setScrapingStatus(`Metadata not ready: ${metadataStatus.metadata_status.total_missing} missing`);
-              if (attempts >= maxAttempts) {
-                setScrapingStatus('Metadata verification timeout. Please refresh the page to try again.');
-              } else {
-                setTimeout(verify, 3000);
-              }
-              return;
-            }
-          } else {
-            throw new Error('Failed to check metadata readiness');
-          }
-        } catch (error) {
-          console.error('Verification error:', error);
-          if (attempts >= maxAttempts) {
-            setScrapingStatus('Metadata verification timeout. Please refresh the page to try again.');
-          } else {
-            setTimeout(verify, 3000);
-          }
-        }
-      };
-      
-      await verify();
+      } catch (error) {
+        console.error('Status check error:', error);
+        setScrapingStatus('Error checking status. Please refresh the page to try again.');
+      }
     }
     
     fetchHandlesAndStartScraping();
-  }, [blendId, navigate, handles.user_a, handles.user_b]);
+  }, [blendId, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 font-manrope">
@@ -228,7 +115,7 @@ export default function ScrapingPage() {
         <BackgroundGlow isScoreRevealed={false} />
       </div>
       
-      {/* Just the loading ring */}
+      {/* Loading ring */}
       <div className="relative inline-block">
         <svg className="w-96 h-96 animate-spin" viewBox="0 0 100 100">
           {/* Background circle */}
@@ -264,6 +151,11 @@ export default function ScrapingPage() {
             </linearGradient>
           </defs>
         </svg>
+      </div>
+      
+      {/* Status text */}
+      <div className="mt-8 text-center">
+        <p className="text-lg text-gray-700 font-medium">{scrapingStatus}</p>
       </div>
     </div>
   );

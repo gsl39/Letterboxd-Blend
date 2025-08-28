@@ -42,41 +42,44 @@ export default function StartBlendPage() {
     }
   };
 
-    useEffect(() => {
+  useEffect(() => {
     if (!blendId) return;
+    
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("blends")
         .select("user_b")
         .eq("blend_id", blendId)
         .single();
+      
       if (data && data.user_b) {
         clearInterval(interval);
         // Redirect to scraping page - it will coordinate both users
         navigate(`/blend/${blendId}/scraping`);
       }
     }, 2000);
+    
     return () => clearInterval(interval);
   }, [blendId, navigate]);
 
-    return (
-      <div className="relative min-h-screen overflow-hidden">
-        <div className="fixed inset-0 -z-10">
-            <BackgroundGlow />
-        </div>
+  return (
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="fixed inset-0 -z-10">
+        <BackgroundGlow />
+      </div>
 
-        {!blendId ? (
-          <EmailSignup onSubmit={handleStartBlend} />
-        ) : (
-          <QRCodeDisplay blendId={blendId} />
-        )}
+      {!blendId ? (
+        <EmailSignup onSubmit={handleStartBlend} />
+      ) : (
+        <QRCodeDisplay blendId={blendId} />
+      )}
 
-        {/* Made by Guilherme Lima */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-          <p className="text-sm font-manrope text-gray-500">
-            Made by Guilherme Lima
-          </p>
-        </div>
+      {/* Made by Guilherme Lima */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
+        <p className="text-sm font-manrope text-gray-500">
+          Made by Guilherme Lima
+        </p>
+      </div>
     </div>
   );
 }

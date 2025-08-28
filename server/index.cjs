@@ -54,7 +54,8 @@ function isScrapingComplete(blendId) {
 }
 
 // Helper function to mark scraping complete for a user in a blend
-function markScrapingComplete(blendId, user, scrapedCount) {
+// This function now automatically triggers the next step when both users are complete
+async function markScrapingComplete(blendId, user, scrapedCount) {
   if (!scrapingLocks.has(blendId)) {
     scrapingLocks.set(blendId, { 
       user_a_complete: false, 
@@ -72,6 +73,43 @@ function markScrapingComplete(blendId, user, scrapedCount) {
     lock.user_b_count = scrapedCount;
   }
   console.log(`🔒 Scraping lock updated for blend ${blendId}:`, lock);
+  
+  // Check if both users are now complete - if so, trigger automatic metadata readiness check
+  if (lock.user_a_complete && lock.user_b_complete) {
+    console.log(`🎯 Both users complete for blend ${blendId}! Triggering automatic metadata readiness check...`);
+    
+    // Get the blend details to know which users to check
+    const { data: blendData } = await supabase
+      .from('blends')
+      .select('user_a, user_b')
+      .eq('blend_id', blendId)
+      .single();
+    
+    if (blendData) {
+      // Automatically check metadata readiness and store the result
+      try {
+        const metadataStatus = await checkMetadataReadiness(
+          blendData.user_a, 
+          blendData.user_b, 
+          { user_a_count: lock.user_a_count, user_b_count: lock.user_b_count }
+        );
+        
+        // Store the metadata readiness result in the scraping lock for quick access
+        lock.metadata_ready = metadataStatus.ready;
+        lock.metadata_status = metadataStatus;
+        
+        console.log(`📊 Automatic metadata check complete for blend ${blendId}:`, {
+          ready: metadataStatus.ready,
+          total_missing: metadataStatus.metadata_status?.total_missing || 0
+        });
+        
+      } catch (error) {
+        console.error(`❌ Error in automatic metadata check for blend ${blendId}:`, error);
+        lock.metadata_ready = false;
+        lock.metadata_error = error.message;
+      }
+    }
+  }
 }
 
 app.post('/api/scrape', async (req, res) => {
@@ -294,7 +332,7 @@ app.post('/api/scrape', async (req, res) => {
     
     // Now that both user movies AND metadata are complete, mark scraping complete
     ongoingScrapes.delete(`${blend_id}:${user}`);
-    markScrapingComplete(blend_id, user, rows.length);
+    await markScrapingComplete(blend_id, user, rows.length);
     console.log(`✅ Scraping AND metadata complete for ${handle} (${user}) in blend ${blend_id}`);
     
     // Send response after everything is complete
@@ -368,6 +406,57 @@ app.post('/api/blend-scraping-status', async (req, res) => {
     
   } catch (err) {
     console.error('Error checking blend scraping status:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// New endpoint to get the final blend status (scraping + metadata) without polling
+app.post('/api/blend-final-status', async (req, res) => {
+  try {
+    const { blend_id } = req.body;
+    if (!blend_id) {
+      return res.status(400).json({ error: 'Missing blend_id' });
+    }
+    
+    console.log(`Getting final status for blend: ${blend_id}`);
+    
+    const lock = scrapingLocks.get(blend_id);
+    if (!lock) {
+      return res.json({
+        success: true,
+        blend_id,
+        status: 'not_started',
+        ready: false
+      });
+    }
+    
+    // If both users are complete, return the final status
+    if (lock.user_a_complete && lock.user_b_complete) {
+      return res.json({
+        success: true,
+        blend_id,
+        status: 'complete',
+        ready: lock.metadata_ready || false,
+        user_a_count: lock.user_a_count,
+        user_b_count: lock.user_b_count,
+        metadata_status: lock.metadata_status || null,
+        metadata_error: lock.metadata_error || null
+      });
+    } else {
+      return res.json({
+        success: true,
+        blend_id,
+        status: 'in_progress',
+        ready: false,
+        user_a_complete: lock.user_a_complete,
+        user_b_complete: lock.user_b_complete,
+        user_a_count: lock.user_a_count,
+        user_b_count: lock.user_b_count
+      });
+    }
+    
+  } catch (err) {
+    console.error('Error getting final blend status:', err);
     res.status(500).json({ error: err.message });
   }
 });
