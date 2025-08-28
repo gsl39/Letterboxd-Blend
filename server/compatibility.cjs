@@ -832,6 +832,9 @@ async function checkMetadataReadiness(userA, userB, lockData) {
       console.log(`🔍 Actual counts - User A: ${userAFilms.length}, User B: ${userBFilms.length}`);
       
       // Verify scraping completeness with ±10 buffer for robustness
+      let userAComplete = false;
+      let userBComplete = false;
+      
       if (expectedUserACount && Math.abs(userAFilms.length - expectedUserACount) > buffer) {
         return {
           ready: false,
@@ -844,6 +847,10 @@ async function checkMetadataReadiness(userA, userB, lockData) {
             user_a_complete: false
           }
         };
+      } else if (expectedUserACount) {
+        // User A count is within buffer - mark as complete
+        userAComplete = true;
+        console.log(`✅ User A scraping verified: expected ${expectedUserACount} ±${buffer}, got ${userAFilms.length}`);
       }
       
       if (expectedUserBCount && Math.abs(userBFilms.length - expectedUserBCount) > buffer) {
@@ -858,6 +865,10 @@ async function checkMetadataReadiness(userA, userB, lockData) {
             user_b_complete: false
           }
         };
+      } else if (expectedUserBCount) {
+        // User B count is within buffer - mark as complete
+        userBComplete = true;
+        console.log(`✅ User B scraping verified: expected ${expectedUserBCount} ±${buffer}, got ${userBFilms.length}`);
       }
     }
     
@@ -889,10 +900,10 @@ async function checkMetadataReadiness(userA, userB, lockData) {
       scraping_verification: {
         user_a_expected: expectedUserACount,
         user_a_actual: userAFilms.length,
-        user_a_complete: expectedUserACount ? Math.abs(userAFilms.length - expectedUserACount) <= buffer : null,
+        user_a_complete: userAComplete,
         user_b_expected: expectedUserBCount,
         user_b_actual: userBFilms.length,
-        user_b_complete: expectedUserBCount ? Math.abs(userBFilms.length - expectedUserBCount) <= buffer : null
+        user_b_complete: userBComplete
       }
     };
   } catch (err) {
