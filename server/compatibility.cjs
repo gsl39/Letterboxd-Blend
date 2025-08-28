@@ -542,15 +542,19 @@ async function getUserFilmsData(userHandle) {
     let allMovies = [];
     let offset = 0;
     const batchSize = 1000;
+    let data; // Declare data variable outside the loop scope
     
     console.log(`🔍 Fetching movies for ${userHandle} in batches of ${batchSize}...`);
     
     do {
-      const { data, error } = await supabase
+      const result = await supabase
         .from('user_films_with_films')
         .select('*')
         .eq('user_handle', userHandle)
         .range(offset, offset + batchSize - 1);
+      
+      data = result.data; // Assign to outer variable
+      const { error } = result;
       
       if (error) {
         console.error(`Error fetching batch for ${userHandle} at offset ${offset}:`, error);
