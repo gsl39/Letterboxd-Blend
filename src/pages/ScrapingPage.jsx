@@ -291,13 +291,6 @@ export default function ScrapingPage() {
             </linearGradient>
           </defs>
         </svg>
-        
-        {/* Loading text overlay */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-2xl font-manrope text-gray-600 animate-pulse">
-            Scraping movies from Letterboxd...
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -7,19 +7,8 @@ const { findCommonMovies, getCommonMoviesSummary, findBiggestDisagreementMovie }
 
 const app = express();
 
-// Configure CORS to allow requests from Vercel
-app.use(cors({
-  origin: [
-    'https://letterboxd-blend-9uuu4sh7s-guilherme-limas-projects-7236477c.vercel.app',
-    'https://letterboxd-blend-5tppkwxte-guilherme-limas-projects-7236477c.vercel.app', // New domain
-    'https://letterboxd-blend.vercel.app',
-    'http://localhost:5173', // For local development
-    'http://localhost:3000'  // For local development
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// CORS configuration - allow all origins (like it was working before)
+app.use(cors());
 
 app.use(express.json());
 
