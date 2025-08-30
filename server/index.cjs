@@ -2,8 +2,114 @@ const express = require('express');
 const cors = require('cors');
 const { getAllWatchedMovies, getFilmMetadataFromLetterboxd } = require('../scraper/letterboxdScraper.cjs');
 const supabase = require('./supabaseClient.cjs');
-const { getCompatibilityScore, checkMetadataReadiness } = require('./compatibility.cjs');
+const { getCompatibilityScore } = require('./compatibility.cjs');
 const { findCommonMovies, getCommonMoviesSummary, findBiggestDisagreementMovie } = require('./commonMovies.cjs');
+
+// Function to get user films data from Supabase using batch processing
+async function getUserFilmsData(userHandle) {
+  try {
+    let allMovies = [];
+    let offset = 0;
+    const batchSize = 1000;
+    let data;
+    
+    console.log(`🔍 Fetching movies for ${userHandle} in batches of ${batchSize}...`);
+    
+    do {
+      const result = await supabase
+        .from('user_films_with_films')
+        .select('*')
+        .eq('user_handle', userHandle)
+        .range(offset, offset + batchSize - 1);
+      
+      data = result.data;
+      const { error } = result;
+      
+      if (error) {
+        console.error(`Error fetching batch for ${userHandle} at offset ${offset}:`, error);
+        break;
+      }
+      
+      if (data && data.length > 0) {
+        allMovies = allMovies.concat(data);
+        console.log(`📦 Fetched batch: ${data.length} movies (total so far: ${allMovies.length})`);
+      }
+      
+      offset += batchSize;
+    } while (data && data.length === batchSize);
+    
+    console.log(`✅ Total movies fetched for ${userHandle}: ${allMovies.length}`);
+    return allMovies;
+  } catch (err) {
+    console.error(`Error fetching data for user ${userHandle}:`, err);
+    return [];
+  }
+}
+
+// Function to check metadata readiness with 90% threshold and OR logic
+async function checkMetadataReadiness(userA, userB) {
+  try {
+    console.log(`🔍 Checking metadata readiness for ${userA} vs ${userB}`);
+    
+    // Get all films for both users using batch processing
+    const userAFilms = await getUserFilmsData(userA);
+    const userBFilms = await getUserFilmsData(userB);
+    
+    if (userAFilms.length === 0 || userBFilms.length === 0) {
+      return {
+        ready: false,
+        error: "One or both users have no films",
+        user_a: userA,
+        user_b: userB
+      };
+    }
+    
+    // Check metadata completeness for each user (90% threshold with OR logic)
+    const userAMetadataCount = userAFilms.filter(film => 
+      film.genres !== null || film.directors !== null || film.popularity !== null
+    ).length;
+    
+    const userBMetadataCount = userBFilms.filter(film => 
+      film.genres !== null || film.directors !== null || film.popularity !== null
+    ).length;
+    
+    const userAMetadataPercentage = (userAMetadataCount / userAFilms.length) * 100;
+    const userBMetadataPercentage = (userBMetadataCount / userBFilms.length) * 100;
+    
+    console.log(`📊 Metadata completion - User A: ${userAMetadataPercentage.toFixed(1)}% (${userAMetadataCount}/${userAFilms.length})`);
+    console.log(`📊 Metadata completion - User B: ${userBMetadataPercentage.toFixed(1)}% (${userBMetadataCount}/${userBFilms.length})`);
+    
+    // Both users need 90%+ metadata completion
+    const userAReady = userAMetadataPercentage >= 90;
+    const userBReady = userBMetadataPercentage >= 90;
+    const bothReady = userAReady && userBReady;
+    
+    return {
+      ready: bothReady,
+      user_a: userA,
+      user_b: userB,
+      metadata_status: {
+        user_a_total: userAFilms.length,
+        user_b_total: userBFilms.length,
+        user_a_with_metadata: userAMetadataCount,
+        user_b_with_metadata: userBMetadataCount,
+        user_a_percentage: Math.round(userAMetadataPercentage * 10) / 10,
+        user_b_percentage: Math.round(userBMetadataPercentage * 10) / 10,
+        user_a_ready: userAReady,
+        user_b_ready: userBReady
+      }
+    };
+    
+  } catch (err) {
+    console.error('Error checking metadata readiness:', err);
+    return {
+      ready: false,
+      error: err.message,
+      user_a: userA,
+      user_b: userB
+    };
+  }
+}
 
 const app = express();
 
@@ -54,7 +160,6 @@ function isScrapingComplete(blendId) {
 }
 
 // Helper function to mark scraping complete for a user in a blend
-// This function now automatically triggers the next step when both users are complete
 async function markScrapingComplete(blendId, user, scrapedCount) {
   if (!scrapingLocks.has(blendId)) {
     scrapingLocks.set(blendId, { 
@@ -74,41 +179,9 @@ async function markScrapingComplete(blendId, user, scrapedCount) {
   }
   console.log(`🔒 Scraping lock updated for blend ${blendId}:`, lock);
   
-  // Check if both users are now complete - if so, trigger automatic metadata readiness check
+  // Both users are now complete - metadata will be checked by the frontend when ready
   if (lock.user_a_complete && lock.user_b_complete) {
-    console.log(`🎯 Both users complete for blend ${blendId}! Triggering automatic metadata readiness check...`);
-    
-    // Get the blend details to know which users to check
-    const { data: blendData } = await supabase
-      .from('blends')
-      .select('user_a, user_b')
-      .eq('blend_id', blendId)
-      .single();
-    
-    if (blendData) {
-      // Automatically check metadata readiness and store the result
-      try {
-        const metadataStatus = await checkMetadataReadiness(
-          blendData.user_a, 
-          blendData.user_b, 
-          { user_a_count: lock.user_a_count, user_b_count: lock.user_b_count }
-        );
-        
-        // Store the metadata readiness result in the scraping lock for quick access
-        lock.metadata_ready = metadataStatus.ready;
-        lock.metadata_status = metadataStatus;
-        
-        console.log(`📊 Automatic metadata check complete for blend ${blendId}:`, {
-          ready: metadataStatus.ready,
-          total_missing: metadataStatus.metadata_status?.total_missing || 0
-        });
-        
-      } catch (error) {
-        console.error(`❌ Error in automatic metadata check for blend ${blendId}:`, error);
-        lock.metadata_ready = false;
-        lock.metadata_error = error.message;
-      }
-    }
+    console.log(`🎯 Both users complete for blend ${blendId}! Metadata will be checked when frontend requests status.`);
   }
 }
 
@@ -410,7 +483,10 @@ app.post('/api/blend-scraping-status', async (req, res) => {
   }
 });
 
-// New endpoint to get the final blend status (scraping + metadata) without polling
+// Track blend access times for 20-second delay
+const blendAccessTimes = new Map(); // blend_id -> first access timestamp
+
+// New endpoint to get the final blend status with 20-second delay and metadata check
 app.post('/api/blend-final-status', async (req, res) => {
   try {
     const { blend_id } = req.body;
@@ -420,40 +496,52 @@ app.post('/api/blend-final-status', async (req, res) => {
     
     console.log(`Getting final status for blend: ${blend_id}`);
     
-    const lock = scrapingLocks.get(blend_id);
-    if (!lock) {
+    // Get the blend details
+    const { data: blendData } = await supabase
+      .from('blends')
+      .select('user_a, user_b')
+      .eq('blend_id', blend_id)
+      .single();
+    
+    if (!blendData) {
+      return res.json({ ready: false, error: 'Blend not found' });
+    }
+    
+    // Check if 20 seconds have passed since first access to this blend
+    const now = Date.now();
+    if (!blendAccessTimes.has(blend_id)) {
+      blendAccessTimes.set(blend_id, now);
+    }
+    
+    const firstAccessTime = blendAccessTimes.get(blend_id);
+    const blendAge = now - firstAccessTime;
+    const twentySeconds = 20 * 1000;
+    
+    if (blendAge < twentySeconds) {
+      console.log(`Blend ${blend_id} is only ${Math.round(blendAge/1000)}s old, waiting for 20s...`);
       return res.json({
         success: true,
         blend_id,
-        status: 'not_started',
-        ready: false
+        ready: false,
+        message: 'Waiting for scraping to complete...',
+        timeRemaining: Math.ceil((twentySeconds - blendAge) / 1000)
       });
     }
     
-    // If both users are complete, return the final status
-    if (lock.user_a_complete && lock.user_b_complete) {
-      return res.json({
-        success: true,
-        blend_id,
-        status: 'complete',
-        ready: lock.metadata_ready || false,
-        user_a_count: lock.user_a_count,
-        user_b_count: lock.user_b_count,
-        metadata_status: lock.metadata_status || null,
-        metadata_error: lock.metadata_error || null
-      });
-    } else {
-      return res.json({
-        success: true,
-        blend_id,
-        status: 'in_progress',
-        ready: false,
-        user_a_complete: lock.user_a_complete,
-        user_b_complete: lock.user_b_complete,
-        user_a_count: lock.user_a_count,
-        user_b_count: lock.user_b_count
-      });
-    }
+    // 20+ seconds have passed, now check metadata readiness
+    console.log(`Blend ${blend_id} is ${Math.round(blendAge/1000)}s old, checking metadata...`);
+    
+    const metadataStatus = await checkMetadataReadiness(
+      blendData.user_a, 
+      blendData.user_b
+    );
+    
+    return res.json({
+      success: true,
+      blend_id,
+      ready: metadataStatus.ready,
+      metadata_status: metadataStatus
+    });
     
   } catch (err) {
     console.error('Error getting final blend status:', err);
