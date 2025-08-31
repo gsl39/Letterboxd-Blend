@@ -738,34 +738,8 @@ async function getCompatibilityScore(userA, userB) {
     
     console.log('📊 Films loaded - userA:', userAFilms.length, 'userB:', userBFilms.length);
     
-    // Check if ALL movies have metadata before proceeding
-    const userAMissingMetadata = userAFilms.filter(film => 
-      !film.genres || !film.directors || film.popularity === null
-    );
-    const userBMissingMetadata = userBFilms.filter(film => 
-      !film.genres || !film.directors || film.popularity === null
-    );
-    
-    console.log('🔍 Metadata check - userA missing:', userAMissingMetadata.length, 'userB missing:', userBMissingMetadata.length);
-    
-    if (userAMissingMetadata.length > 0 || userBMissingMetadata.length > 0) {
-      console.log('❌ Some movies missing metadata - cannot calculate compatibility yet');
-      console.log('❌ UserA missing metadata for:', userAMissingMetadata.map(f => f.film_slug).slice(0, 5));
-      console.log('❌ UserB missing metadata for:', userBMissingMetadata.map(f => f.film_slug).slice(0, 5));
-      
-      return {
-        error: "Some movies are missing metadata. Please wait for metadata scraping to complete.",
-        user_a: userA,
-        user_b: userB,
-        metadata_status: {
-          user_a_missing: userAMissingMetadata.length,
-          user_b_missing: userBMissingMetadata.length,
-          total_missing: userAMissingMetadata.length + userBMissingMetadata.length
-        }
-      };
-    }
-    
-    console.log('✅ All movies have metadata - proceeding with compatibility calculation');
+    // Metadata readiness is already verified by the scraping page
+    // Proceed directly with compatibility calculation
     
     const result = calculateCompatibilityScore(userAFilms, userBFilms);
     
