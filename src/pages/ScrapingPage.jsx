@@ -82,19 +82,14 @@ export default function ScrapingPage() {
           const finalStatus = await response.json();
           console.log('Final status check:', finalStatus);
           
-          if (finalStatus.status === 'complete' && finalStatus.ready) {
+          if (finalStatus.ready) {
             setScrapingStatus('🎯 ALL SYSTEMS READY! Redirecting to results...');
             setTimeout(() => {
               navigate(`/blend/${blendId}/results`);
             }, 2000);
             return;
-          } else if (finalStatus.status === 'in_progress') {
-            setScrapingStatus(`Scraping in progress... User A: ${finalStatus.user_a_complete ? '✅' : '⏳'}, User B: ${finalStatus.user_b_complete ? '✅' : '⏳'}`);
-            // Check again in 2 seconds
-            setTimeout(checkFinalStatus, 2000);
           } else {
-            setScrapingStatus('Waiting for scraping to complete...');
-            // Check again in 2 seconds
+            // Not ready yet, check again in 2 seconds
             setTimeout(checkFinalStatus, 2000);
           }
         } else {

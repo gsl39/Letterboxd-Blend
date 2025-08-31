@@ -241,14 +241,14 @@ app.post('/api/scrape', async (req, res) => {
     }
 
     console.log(`💾 Inserted ${rows.length} movies for ${handle} in blend ${blend_id}`);
-    
+
     // --- Enrich films table synchronously ---
-    // Get unique film_slugs from this batch
-    const uniqueSlugs = Array.from(
-      new Set(movies.map(m => m.slug && m.slug.trim().toLowerCase()))
-    );
-    console.log('All slugs:', movies.map(m => m.slug));
-    console.log('Unique slugs:', uniqueSlugs);
+      // Get unique film_slugs from this batch
+      const uniqueSlugs = Array.from(
+        new Set(movies.map(m => m.slug && m.slug.trim().toLowerCase()))
+      );
+      console.log('All slugs:', movies.map(m => m.slug));
+      console.log('Unique slugs:', uniqueSlugs);
     
     // Check which films already exist in the database
     // Use a more efficient approach to avoid 414 errors with long URLs
@@ -378,16 +378,16 @@ app.post('/api/scrape', async (req, res) => {
         for (const slug of newSlugs) {
           try {
             console.log(`🔍 Individual fallback for: ${slug}`);
-            const metadata = await getFilmMetadataFromLetterboxd(slug);
-            if (!metadata) {
+          const metadata = await getFilmMetadataFromLetterboxd(slug);
+          if (!metadata) {
               console.warn(`❌ No metadata found for film: ${slug}`);
-              continue;
-            }
+            continue;
+          }
             
             console.log(`📊 Individual metadata for ${slug}:`, metadata);
             
-            const { error: upsertError } = await supabase.from('films').upsert(metadata, { onConflict: ['film_slug'] });
-            if (upsertError) {
+          const { error: upsertError } = await supabase.from('films').upsert(metadata, { onConflict: ['film_slug'] });
+          if (upsertError) {
               console.error(`❌ Individual upsert error for ${slug}:`, upsertError);
             } else {
               console.log(`✅ Individual success for ${slug}`);
