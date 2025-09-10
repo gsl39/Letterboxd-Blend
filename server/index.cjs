@@ -98,43 +98,67 @@ async function checkMetadataReadiness(userA, userB) {
   }
 }
 
-// Scraping endpoint
-app.post('/api/scrape', async (req, res) => {
-  const { handle, blend_id, user } = req.body;
+// Scraping endpoint for StartBlendPage
+app.post('/api/scrape-start-blend', async (req, res) => {
+  const { blend_id } = req.body;
   
-  if (!handle || !blend_id || !user) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (!blend_id) {
+    return res.status(400).json({ error: 'Missing blend_id' });
   }
 
-  const scrapingKey = `${blend_id}:${user}`;
+  const scrapingKey = `${blend_id}:start_blend`;
   
   if (ongoingScrapes.has(scrapingKey)) {
-    return res.status(400).json({ error: 'Scraping already in progress for this user' });
+    return res.status(400).json({ error: 'Scraping already in progress for this blend' });
   }
 
   try {
     ongoingScrapes.add(scrapingKey);
     
-    // Scrape user's movies
-    const movies = await getAllWatchedMovies(handle);
-    console.log(`Scraped ${movies.length} movies for ${handle}`);
-
-    // Insert movies into user_films
-    const rows = movies.map(movie => ({
-      user_handle: handle,
+    // Get both users from the blend
+    const { data: blendData } = await supabase
+      .from('blends')
+      .select('user_a, user_b')
+      .eq('blend_id', blend_id)
+      .single();
+    
+    if (!blendData || !blendData.user_a || !blendData.user_b) {
+      throw new Error('Both users must be present in the blend');
+    }
+    
+    console.log(`🚀 Starting scraping for both users: ${blendData.user_a} and ${blendData.user_b}`);
+    
+    // Scrape User A
+    const userAMovies = await getAllWatchedMovies(blendData.user_a);
+    console.log(`Scraped ${userAMovies.length} movies for ${blendData.user_a}`);
+    
+    const userARows = userAMovies.map(movie => ({
+      user_handle: blendData.user_a,
       film_slug: movie.slug,
       film_title: movie.title,
       rating: movie.rating,
       liked: movie.liked,
     }));
-
-    const { error } = await supabase.from('user_films').upsert(rows, { onConflict: ['user_handle', 'film_slug'] });
-    if (error) {
-      throw error;
-    }
-
-    // Scrape metadata for new films
-    const uniqueSlugs = Array.from(new Set(movies.map(m => m.slug && m.slug.trim().toLowerCase())));
+    
+    await supabase.from('user_films').upsert(userARows, { onConflict: ['user_handle', 'film_slug'] });
+    
+    // Scrape User B
+    const userBMovies = await getAllWatchedMovies(blendData.user_b);
+    console.log(`Scraped ${userBMovies.length} movies for ${blendData.user_b}`);
+    
+    const userBRows = userBMovies.map(movie => ({
+      user_handle: blendData.user_b,
+      film_slug: movie.slug,
+      film_title: movie.title,
+      rating: movie.rating,
+      liked: movie.liked,
+    }));
+    
+    await supabase.from('user_films').upsert(userBRows, { onConflict: ['user_handle', 'film_slug'] });
+    
+    // Scrape metadata for all unique films from both users
+    const allMovies = [...userAMovies, ...userBMovies];
+    const uniqueSlugs = Array.from(new Set(allMovies.map(m => m.slug && m.slug.trim().toLowerCase())));
     
     // Check which films already exist
     let existingSlugs = new Set();
@@ -176,10 +200,131 @@ app.post('/api/scrape', async (req, res) => {
     }
     
     ongoingScrapes.delete(scrapingKey);
-    res.json({ success: true, count: rows.length });
+    res.json({ 
+      success: true, 
+      user_a_count: userARows.length,
+      user_b_count: userBRows.length,
+      total_movies: userARows.length + userBRows.length
+    });
 
   } catch (err) {
-    console.error('Error in scraping:', err);
+    console.error('Error in scraping both users:', err);
+    ongoingScrapes.delete(scrapingKey);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Scraping endpoint for ScrapingPage
+app.post('/api/scrape-join-blend', async (req, res) => {
+  const { blend_id } = req.body;
+  
+  if (!blend_id) {
+    return res.status(400).json({ error: 'Missing blend_id' });
+  }
+
+  const scrapingKey = `${blend_id}:join_blend`;
+  
+  if (ongoingScrapes.has(scrapingKey)) {
+    return res.status(400).json({ error: 'Scraping already in progress for this blend' });
+  }
+
+  try {
+    ongoingScrapes.add(scrapingKey);
+    
+    // Get both users from the blend
+    const { data: blendData } = await supabase
+      .from('blends')
+      .select('user_a, user_b')
+      .eq('blend_id', blend_id)
+      .single();
+    
+    if (!blendData || !blendData.user_a || !blendData.user_b) {
+      throw new Error('Both users must be present in the blend');
+    }
+    
+    console.log(`🚀 Starting scraping for both users: ${blendData.user_a} and ${blendData.user_b}`);
+    
+    // Scrape User A
+    const userAMovies = await getAllWatchedMovies(blendData.user_a);
+    console.log(`Scraped ${userAMovies.length} movies for ${blendData.user_a}`);
+    
+    const userARows = userAMovies.map(movie => ({
+      user_handle: blendData.user_a,
+      film_slug: movie.slug,
+      film_title: movie.title,
+      rating: movie.rating,
+      liked: movie.liked,
+    }));
+    
+    await supabase.from('user_films').upsert(userARows, { onConflict: ['user_handle', 'film_slug'] });
+    
+    // Scrape User B
+    const userBMovies = await getAllWatchedMovies(blendData.user_b);
+    console.log(`Scraped ${userBMovies.length} movies for ${blendData.user_b}`);
+    
+    const userBRows = userBMovies.map(movie => ({
+      user_handle: blendData.user_b,
+      film_slug: movie.slug,
+      film_title: movie.title,
+      rating: movie.rating,
+      liked: movie.liked,
+    }));
+    
+    await supabase.from('user_films').upsert(userBRows, { onConflict: ['user_handle', 'film_slug'] });
+    
+    // Scrape metadata for all unique films from both users
+    const allMovies = [...userAMovies, ...userBMovies];
+    const uniqueSlugs = Array.from(new Set(allMovies.map(m => m.slug && m.slug.trim().toLowerCase())));
+    
+    // Check which films already exist
+    let existingSlugs = new Set();
+    const batchSize = 50;
+    
+    for (let i = 0; i < uniqueSlugs.length; i += batchSize) {
+      const batch = uniqueSlugs.slice(i, i + batchSize);
+      const { data: batchFilms, error: batchError } = await supabase
+        .from('films')
+        .select('film_slug')
+        .in('film_slug', batch);
+      
+      if (batchError) {
+        console.error('Error checking existing films:', batchError);
+        break;
+      }
+      
+      batchFilms?.forEach(f => existingSlugs.add(f.film_slug));
+    }
+    
+    const newSlugs = uniqueSlugs.filter(slug => !existingSlugs.has(slug));
+    
+    // Scrape metadata for new films
+    if (newSlugs.length > 0) {
+      console.log(`Scraping metadata for ${newSlugs.length} new films...`);
+      
+      for (const slug of newSlugs) {
+        try {
+          const metadata = await getFilmMetadataFromLetterboxd(slug);
+          if (metadata) {
+            await supabase.from('films').upsert(metadata, { onConflict: ['film_slug'] });
+            console.log(`Scraped metadata for: ${slug}`);
+          }
+          await new Promise(r => setTimeout(r, 500)); // Rate limiting
+        } catch (err) {
+          console.error(`Error scraping ${slug}:`, err.message);
+        }
+      }
+    }
+    
+    ongoingScrapes.delete(scrapingKey);
+    res.json({ 
+      success: true, 
+      user_a_count: userARows.length,
+      user_b_count: userBRows.length,
+      total_movies: userARows.length + userBRows.length
+    });
+
+  } catch (err) {
+    console.error('Error in scraping both users:', err);
     ongoingScrapes.delete(scrapingKey);
     res.status(500).json({ error: err.message });
   }

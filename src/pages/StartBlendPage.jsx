@@ -22,45 +22,36 @@ export default function StartBlendPage() {
     await supabase.from('blends').insert([{ blend_id, user_a: cleanHandle }]);
     setBlendId(blend_id);
 
-    // Call your Express API to scrape movies for User A
-    try {
-      console.log(`🚀 Starting scraping for User A: ${cleanHandle}`);
-      const response = await fetch(`${BACKEND_URL}/api/scrape`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle: cleanHandle, blend_id, user: 'a' }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Scraping failed: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log(`✅ User A scraping result:`, result);
-    } catch (error) {
-      console.error(`❌ User A scraping failed:`, error);
-    }
-  };
-
-  useEffect(() => {
-    if (!blendId) return;
-    
+    // Wait for both users to join, then scrape both with one API call
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from("blends")
-        .select("user_b")
-        .eq("blend_id", blendId)
+        .select("user_a, user_b")
+        .eq("blend_id", blend_id)
         .single();
       
-      if (data && data.user_b) {
+      if (data && data.user_a && data.user_b) {
         clearInterval(interval);
-        // Redirect to scraping page - it will coordinate both users
-        navigate(`/blend/${blendId}/scraping`);
+        
+        console.log(`🚀 Both users joined! Starting scraping for both: ${data.user_a} and ${data.user_b}`);
+        
+        // Single API call that scrapes both users
+        const response = await fetch(`${BACKEND_URL}/api/scrape-start-blend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blend_id }),
+        });
+        
+        const result = await response.json();
+        console.log(`✅ Both users scraping completed:`, result);
+        
+        // Both users scraped, redirect to results
+        navigate(`/blend/${blend_id}/results`);
       }
     }, 2000);
-    
-    return () => clearInterval(interval);
-  }, [blendId, navigate]);
+  };
+
+  // No more polling - User A redirects immediately after scraping
 
   return (
     <div className="relative min-h-screen overflow-hidden">

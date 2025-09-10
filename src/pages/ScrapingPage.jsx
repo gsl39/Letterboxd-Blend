@@ -34,70 +34,31 @@ export default function ScrapingPage() {
         
         setHandles({ user_a: data.user_a, user_b: data.user_b });
         
-        // Start scraping for User B
-        setScrapingStatus('Starting scraping for User B...');
+        // Scrape both users with one API call
+        setScrapingStatus('Starting scraping for both users...');
         
-        try {
-          const response = await fetch(`${BACKEND_URL}/api/scrape`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              handle: data.user_b, 
-              blend_id: blendId, 
-              user: 'b' 
-            }),
-          });
-          
-          if (response.ok) {
-            console.log('Scraping started for user_b:', data.user_b);
-            setScrapingStatus('Scraping in progress... Waiting for completion...');
-            
-            // Start checking final status
-            checkFinalStatus();
-          } else {
-            const errorText = await response.text();
-            throw new Error(`Scraping failed: ${errorText}`);
-          }
-        } catch (error) {
-          console.error('Scraping failed:', error);
-          setScrapingStatus(`Scraping failed: ${error.message}. Please refresh the page to try again.`);
-        }
+        console.log(`🚀 Starting scraping for both users: ${data.user_a} and ${data.user_b}`);
+        
+        // Single API call that scrapes both users
+        const response = await fetch(`${BACKEND_URL}/api/scrape-join-blend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blend_id: blendId }),
+        });
+        
+        const result = await response.json();
+        console.log(`✅ Both users scraping completed:`, result);
+        
+        setScrapingStatus('Both users scraped! Redirecting to results...');
+        
+        // Both users scraped, redirect to results
+        setTimeout(() => {
+          navigate(`/blend/${blendId}/results`);
+        }, 2000);
         
       } catch (error) {
         console.error('Error:', error);
         setScrapingStatus(`Error: ${error.message}. Please refresh the page to try again.`);
-      }
-    }
-    
-    // Simple function to check final status every 2 seconds
-    async function checkFinalStatus() {
-      try {
-        const response = await fetch(`${BACKEND_URL}/api/blend-final-status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ blend_id: blendId })
-        });
-        
-        if (response.ok) {
-          const finalStatus = await response.json();
-          console.log('Final status check:', finalStatus);
-          
-          if (finalStatus.ready) {
-            setScrapingStatus('🎯 ALL SYSTEMS READY! Redirecting to results...');
-            setTimeout(() => {
-              navigate(`/blend/${blendId}/results`);
-            }, 2000);
-            return;
-          } else {
-            // Not ready yet, check again in 2 seconds
-            setTimeout(checkFinalStatus, 2000);
-          }
-        } else {
-          throw new Error('Failed to check final status');
-        }
-      } catch (error) {
-        console.error('Status check error:', error);
-        setScrapingStatus('Error checking status. Please refresh the page to try again.');
       }
     }
     
